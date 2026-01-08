@@ -49,7 +49,9 @@ oc login --token=<your-token> --server=<your-openshift-api-server>
 oc whoami
 ```
 
-### 4. Configure opencode
+### 4. Configure your MCP client
+
+#### OpenCode
 
 Add to `~/.config/opencode/opencode.json`:
 
@@ -67,7 +69,9 @@ Add to `~/.config/opencode/opencode.json`:
 }
 ```
 
-Or for Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+#### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -83,9 +87,45 @@ Or for Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_conf
 }
 ```
 
-### 5. Restart opencode
+#### Claude Code CLI
 
-The `ambient-code_acp_*` tools will now be available.
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "ambient-code": {
+      "command": "bun",
+      "args": ["run", "/path/to/mcp/src/index.ts"],
+      "env": {
+        "ACP_BASE_URL": "https://<your-acp-route>"
+      }
+    }
+  }
+}
+```
+
+#### OpenAI Codex CLI
+
+Add to `~/.codex/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ambient-code": {
+      "command": "bun",
+      "args": ["run", "/path/to/mcp/src/index.ts"],
+      "env": {
+        "ACP_BASE_URL": "https://<your-acp-route>"
+      }
+    }
+  }
+}
+```
+
+### 5. Restart your client
+
+The tools will be available after restart.
 
 ## Usage
 
