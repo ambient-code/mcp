@@ -262,7 +262,7 @@ async function handleGetSession(
 async function handleGetEvents(
   project: string,
   session: string,
-  limit = 50,
+  _limit = 50,
 ): Promise<string> {
   // For non-streaming, we'll fetch the session status which includes recent activity
   // The SSE endpoint is for real-time streaming, not suitable for MCP tool response
