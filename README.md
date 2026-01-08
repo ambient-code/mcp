@@ -69,45 +69,16 @@ Add to `~/.config/opencode/opencode.json`:
 }
 ```
 
-#### Claude Desktop
+#### Claude Desktop, Claude Code CLI, OpenAI Codex CLI
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+These clients use the standard MCP config format. Add to:
 
-```json
-{
-  "mcpServers": {
-    "ambient-code": {
-      "command": "bun",
-      "args": ["run", "/path/to/mcp/src/index.ts"],
-      "env": {
-        "ACP_BASE_URL": "https://<your-acp-route>"
-      }
-    }
-  }
-}
-```
-
-#### Claude Code CLI
-
-Add to `~/.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "ambient-code": {
-      "command": "bun",
-      "args": ["run", "/path/to/mcp/src/index.ts"],
-      "env": {
-        "ACP_BASE_URL": "https://<your-acp-route>"
-      }
-    }
-  }
-}
-```
-
-#### OpenAI Codex CLI
-
-Add to `~/.codex/config.json`:
+| Client                   | Config file                                                       |
+| ------------------------ | ----------------------------------------------------------------- |
+| Claude Desktop (macOS)   | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json`                     |
+| Claude Code CLI          | `~/.claude/settings.json`                                         |
+| OpenAI Codex CLI         | `~/.codex/config.json`                                            |
 
 ```json
 {
