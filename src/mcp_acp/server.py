@@ -114,14 +114,14 @@ def get_client() -> ACPClient:
     if _client is None:
         config_path = os.getenv("ACP_CLUSTER_CONFIG")
         try:
-            logger.info(f"Initializing ACP client with config: {config_path or 'default'}")
+            logger.info("acp_client_initializing", config_path=config_path or "default")
             _client = ACPClient(config_path=config_path)
-            logger.info("ACP client initialized successfully")
+            logger.info("acp_client_initialized")
         except ValueError as e:
-            logger.error(f"Failed to initialize ACP client: {e}")
+            logger.error("acp_client_init_failed", error=str(e))
             raise
         except Exception as e:
-            logger.error(f"Unexpected error initializing ACP client: {e}", exc_info=True)
+            logger.error("acp_client_init_unexpected_error", error=str(e), exc_info=True)
             raise
     return _client
 
@@ -506,7 +506,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
 
     # Security: Sanitize arguments for logging (remove sensitive data)
     safe_args = {k: v for k, v in arguments.items() if k not in ['token', 'password', 'secret']}
-    logger.info(f"Tool call started: {name} with arguments: {safe_args}")
+    logger.info("tool_call_started", tool=name, arguments=safe_args)
 
     client = get_client()
     dispatch_table = create_dispatch_table(client)
@@ -515,7 +515,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
         handler, formatter = dispatch_table.get(name, (None, None))
 
         if not handler:
-            logger.warning(f"Unknown tool requested: {name}")
+            logger.warning("unknown_tool_requested", tool=name)
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
         # Auto-fill project from default_project if not provided or empty
@@ -527,7 +527,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
                 default_project = cluster_config.get("default_project")
                 if default_project:
                     arguments["project"] = default_project
-                    logger.info(f"Auto-filled project from config: {default_project}")
+                    logger.info("project_autofilled", project=default_project, cluster=default_cluster)
 
         # Call handler (async or sync)
         if asyncio.iscoroutinefunction(handler):
@@ -537,29 +537,29 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
 
         # Log execution time
         elapsed = time.time() - start_time
-        logger.info(f"Tool call completed: {name} in {elapsed:.2f}s")
+        logger.info("tool_call_completed", tool=name, elapsed_seconds=round(elapsed, 2))
 
         # Check for errors in result
         if isinstance(result, dict):
             if result.get("error"):
-                logger.warning(f"Tool {name} returned error: {result.get('error')}")
+                logger.warning("tool_returned_error", tool=name, error=result.get("error"))
             elif not result.get("success", True) and "message" in result:
-                logger.warning(f"Tool {name} failed: {result.get('message')}")
+                logger.warning("tool_failed", tool=name, message=result.get("message"))
 
         return [TextContent(type="text", text=formatter(result))]
 
     except ValueError as e:
         # Validation errors - these are expected for invalid input
         elapsed = time.time() - start_time
-        logger.warning(f"Validation error in tool {name} after {elapsed:.2f}s: {e}")
+        logger.warning("tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
         return [TextContent(type="text", text=f"Validation Error: {str(e)}")]
     except asyncio.TimeoutError as e:
         elapsed = time.time() - start_time
-        logger.error(f"Timeout in tool {name} after {elapsed:.2f}s: {e}")
+        logger.error("tool_timeout", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
         return [TextContent(type="text", text=f"Timeout Error: {str(e)}")]
     except Exception as e:
         elapsed = time.time() - start_time
-        logger.error(f"Unexpected error in tool {name} after {elapsed:.2f}s: {e}", exc_info=True)
+        logger.error("tool_unexpected_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e), exc_info=True)
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
