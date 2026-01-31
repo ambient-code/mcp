@@ -4,14 +4,14 @@
 clusters:
   # Example staging cluster
   vteam-stage:
-    server: https://api.vteam-stage.7fpc.p3.openshiftapps.com:443
-    description: "V-Team Staging Environment"
+    server: https://api.vteam-stage.xxxx.p3.openshiftapps.com:443
+    description: "ACP Staging Environment"
     default_project: jeder-workspace
 
   # Example production cluster
   vteam-prod:
     server: https://api.vteam-prod.xxxx.p3.openshiftapps.com:443
-    description: "V-Team Production"
+    description: "ACP Production"
     default_project: jeder-workspace
 
   # Example development cluster
