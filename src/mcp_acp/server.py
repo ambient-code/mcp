@@ -6,24 +6,14 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
-
+from mcp.types import TextContent, Tool
 from utils.pylogger import get_python_logger
+
 from .client import ACPClient
-from .settings import load_settings
-from .formatters import (
-    format_bulk_result,
-    format_cluster_operation,
-    format_clusters,
-    format_export,
-    format_logs,
-    format_metrics,
-    format_result,
-    format_sessions_list,
-    format_transcript,
-    format_whoami,
-    format_workflows,
-)
+from .formatters import (format_bulk_result, format_cluster_operation,
+                         format_clusters, format_export, format_logs,
+                         format_metrics, format_result, format_sessions_list,
+                         format_transcript, format_whoami, format_workflows)
 
 # Initialize structured logger
 logger = get_python_logger()
@@ -76,6 +66,25 @@ SCHEMA_FRAGMENTS = {
         "items": {"type": "string"},
         "description": "List of repository URLs",
     },
+    "labels_dict": {
+        "type": "object",
+        "description": "Label key-value pairs (e.g., {'env': 'prod'})",
+        "additionalProperties": {"type": "string"},
+    },
+    "label_keys_list": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of label keys to remove (without prefix)",
+    },
+    "resource_type": {
+        "type": "string",
+        "description": "Resource type (agenticsession, namespace, etc)",
+    },
+    "confirm": {
+        "type": "boolean",
+        "description": "Required for destructive bulk ops (default: false)",
+        "default": False,
+    },
 }
 
 
@@ -126,6 +135,29 @@ def get_client() -> ACPClient:
     return _client
 
 
+async def _check_confirmation_then_execute(
+    fn: Callable, args: Dict[str, Any], operation: str
+) -> Any:
+    """Enforce confirmation at server layer (not client).
+
+    Args:
+        fn: Function to execute
+        args: Function arguments
+        operation: Operation name for error message
+
+    Returns:
+        Result from function
+
+    Raises:
+        ValueError: If confirmation not provided for non-dry-run operations
+    """
+    if not args.get("dry_run") and not args.get("confirm"):
+        raise ValueError(
+            f"Bulk {operation} requires explicit confirmation.\n" f"Add confirm=true to proceed."
+        )
+    return await fn(**args)
+
+
 @app.list_tools()
 async def list_tools() -> list[Tool]:
     """List available ACP (Ambient Code Platform) tools for managing AgenticSession resources on OpenShift/Kubernetes."""
@@ -145,7 +177,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="acp_list_sessions",
-            description="List and filter ACP (Ambient Code Platform) AgenticSessions in an OpenShift project. Filter by status (running/stopped/failed), age, display name. Sort and limit results.",
+            description="List and filter ACP (Ambient Code Platform) AgenticSessions in an OpenShift project. Filter by status (running/stopped/failed), age, display name, labels. Sort and limit results.",
             inputSchema=create_tool_schema(
                 properties={
                     "project": "project",
@@ -172,6 +204,10 @@ async def list_tools() -> list[Tool]:
                         "description": "Maximum number of results",
                         "minimum": 1,
                     },
+                    "label_selector": {
+                        "type": "string",
+                        "description": "K8s label selector (e.g., 'acp.ambient-code.ai/label-env=prod,acp.ambient-code.ai/label-team=api')",
+                    },
                 },
                 required=[],
             ),
@@ -191,11 +227,12 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="acp_bulk_delete_sessions",
-            description="Delete multiple sessions at once. Supports dry-run mode.",
+            description="Delete multiple sessions (max 3). DESTRUCTIVE: requires confirm=true. Use dry_run=true first!",
             inputSchema=create_tool_schema(
                 properties={
                     "project": "project",
                     "sessions": "sessions_list",
+                    "confirm": "confirm",
                     "dry_run": "dry_run",
                 },
                 required=["sessions"],
@@ -203,11 +240,12 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="acp_bulk_stop_sessions",
-            description="Stop multiple running sessions at once. Supports dry-run mode.",
+            description="Stop multiple running sessions (max 3). Requires confirm=true. Use dry_run=true first!",
             inputSchema=create_tool_schema(
                 properties={
                     "project": "project",
                     "sessions": "sessions_list",
+                    "confirm": "confirm",
                     "dry_run": "dry_run",
                 },
                 required=["sessions"],
@@ -235,6 +273,136 @@ async def list_tools() -> list[Tool]:
             name="acp_whoami",
             description="Get current authentication status and user information.",
             inputSchema={"type": "object", "properties": {}},
+        ),
+        # Label Management Tools
+        Tool(
+            name="acp_label_resource",
+            description="Add/update labels on any ACP resource. Works for sessions, workspaces, future types. Uses --overwrite.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "resource_type": "resource_type",
+                    "name": "session",
+                    "project": "project",
+                    "labels": "labels_dict",
+                    "dry_run": "dry_run",
+                },
+                required=["resource_type", "name", "project", "labels"],
+            ),
+        ),
+        Tool(
+            name="acp_unlabel_resource",
+            description="Remove specific labels from any ACP resource.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "resource_type": "resource_type",
+                    "name": "session",
+                    "project": "project",
+                    "label_keys": "label_keys_list",
+                    "dry_run": "dry_run",
+                },
+                required=["resource_type", "name", "project", "label_keys"],
+            ),
+        ),
+        Tool(
+            name="acp_bulk_label_resources",
+            description="Label multiple resources (max 3) with same labels. Requires confirm=true.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "resource_type": "resource_type",
+                    "names": "sessions_list",
+                    "project": "project",
+                    "labels": "labels_dict",
+                    "confirm": "confirm",
+                    "dry_run": "dry_run",
+                },
+                required=["resource_type", "names", "project", "labels"],
+            ),
+        ),
+        Tool(
+            name="acp_bulk_unlabel_resources",
+            description="Remove labels from multiple resources (max 3). Requires confirm=true.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "resource_type": "resource_type",
+                    "names": "sessions_list",
+                    "project": "project",
+                    "label_keys": "label_keys_list",
+                    "confirm": "confirm",
+                    "dry_run": "dry_run",
+                },
+                required=["resource_type", "names", "project", "label_keys"],
+            ),
+        ),
+        Tool(
+            name="acp_list_sessions_by_label",
+            description="List sessions filtered by user-friendly labels (convenience wrapper, auto-prefixes labels).",
+            inputSchema=create_tool_schema(
+                properties={
+                    "project": "project",
+                    "labels": "labels_dict",
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by status (running, stopped, etc)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit results",
+                    },
+                },
+                required=["project", "labels"],
+            ),
+        ),
+        Tool(
+            name="acp_bulk_delete_sessions_by_label",
+            description="Delete sessions (max 3) matching label selector. DESTRUCTIVE: requires confirm=true.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "project": "project",
+                    "labels": "labels_dict",
+                    "confirm": "confirm",
+                    "dry_run": "dry_run",
+                },
+                required=["project", "labels"],
+            ),
+        ),
+        Tool(
+            name="acp_bulk_stop_sessions_by_label",
+            description="Stop sessions (max 3) matching label selector. Requires confirm=true.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "project": "project",
+                    "labels": "labels_dict",
+                    "confirm": "confirm",
+                    "dry_run": "dry_run",
+                },
+                required=["project", "labels"],
+            ),
+        ),
+        Tool(
+            name="acp_bulk_restart_sessions",
+            description="Restart multiple stopped sessions (max 3). Requires confirm=true.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "project": "project",
+                    "sessions": "sessions_list",
+                    "confirm": "confirm",
+                    "dry_run": "dry_run",
+                },
+                required=["project", "sessions"],
+            ),
+        ),
+        Tool(
+            name="acp_bulk_restart_sessions_by_label",
+            description="Restart sessions (max 3) matching label selector. Requires confirm=true.",
+            inputSchema=create_tool_schema(
+                properties={
+                    "project": "project",
+                    "labels": "labels_dict",
+                    "confirm": "confirm",
+                    "dry_run": "dry_run",
+                },
+                required=["project", "labels"],
+            ),
         ),
         # P2 Priority Tools
         Tool(
@@ -425,11 +593,15 @@ def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callab
             format_result,
         ),
         "acp_bulk_delete_sessions": (
-            client.bulk_delete_sessions,
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_delete_sessions, args, "delete"
+            ),
             lambda r: format_bulk_result(r, "delete"),
         ),
         "acp_bulk_stop_sessions": (
-            client.bulk_stop_sessions,
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_stop_sessions, args, "stop"
+            ),
             lambda r: format_bulk_result(r, "stop"),
         ),
         "acp_get_session_logs": (
@@ -443,6 +615,55 @@ def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callab
         "acp_whoami": (
             client.whoami,
             format_whoami,
+        ),
+        # Label Management Tools
+        "acp_label_resource": (
+            client.label_resource,
+            format_result,
+        ),
+        "acp_unlabel_resource": (
+            client.unlabel_resource,
+            format_result,
+        ),
+        "acp_bulk_label_resources": (
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_label_resources, args, "label"
+            ),
+            lambda r: format_bulk_result(r, "label"),
+        ),
+        "acp_bulk_unlabel_resources": (
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_unlabel_resources, args, "unlabel"
+            ),
+            lambda r: format_bulk_result(r, "unlabel"),
+        ),
+        "acp_list_sessions_by_label": (
+            client.list_sessions_by_user_labels,
+            format_sessions_list,
+        ),
+        "acp_bulk_delete_sessions_by_label": (
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_delete_sessions_by_label, args, "delete"
+            ),
+            lambda r: format_bulk_result(r, "delete"),
+        ),
+        "acp_bulk_stop_sessions_by_label": (
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_stop_sessions_by_label, args, "stop"
+            ),
+            lambda r: format_bulk_result(r, "stop"),
+        ),
+        "acp_bulk_restart_sessions": (
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_restart_sessions, args, "restart"
+            ),
+            lambda r: format_bulk_result(r, "restart"),
+        ),
+        "acp_bulk_restart_sessions_by_label": (
+            lambda **args: _check_confirmation_then_execute(
+                client.bulk_restart_sessions_by_label, args, "restart"
+            ),
+            lambda r: format_bulk_result(r, "restart"),
         ),
         # P2 Tools
         "acp_clone_session": (
@@ -502,10 +723,11 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
         List of text content responses
     """
     import time
+
     start_time = time.time()
 
     # Security: Sanitize arguments for logging (remove sensitive data)
-    safe_args = {k: v for k, v in arguments.items() if k not in ['token', 'password', 'secret']}
+    safe_args = {k: v for k, v in arguments.items() if k not in ["token", "password", "secret"]}
     logger.info("tool_call_started", tool=name, arguments=safe_args)
 
     client = get_client()
@@ -527,7 +749,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
                 default_project = cluster_config.get("default_project")
                 if default_project:
                     arguments["project"] = default_project
-                    logger.info("project_autofilled", project=default_project, cluster=default_cluster)
+                    logger.info(
+                        "project_autofilled", project=default_project, cluster=default_cluster
+                    )
 
         # Call handler (async or sync)
         if asyncio.iscoroutinefunction(handler):
@@ -551,7 +775,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
     except ValueError as e:
         # Validation errors - these are expected for invalid input
         elapsed = time.time() - start_time
-        logger.warning("tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
+        logger.warning(
+            "tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e)
+        )
         return [TextContent(type="text", text=f"Validation Error: {str(e)}")]
     except asyncio.TimeoutError as e:
         elapsed = time.time() - start_time
@@ -559,7 +785,13 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Timeout Error: {str(e)}")]
     except Exception as e:
         elapsed = time.time() - start_time
-        logger.error("tool_unexpected_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e), exc_info=True)
+        logger.error(
+            "tool_unexpected_error",
+            tool=name,
+            elapsed_seconds=round(elapsed, 2),
+            error=str(e),
+            exc_info=True,
+        )
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
