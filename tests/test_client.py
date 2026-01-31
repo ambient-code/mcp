@@ -122,9 +122,7 @@ class TestACPClient:
             client,
             "_run_oc_command",
             new_callable=AsyncMock,
-            return_value=MagicMock(
-                returncode=0, stdout=json.dumps(mock_response).encode()
-            ),
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
         ):
             result = await client.list_sessions(project="test-project")
 
@@ -152,9 +150,7 @@ class TestACPClient:
             client,
             "_run_oc_command",
             new_callable=AsyncMock,
-            return_value=MagicMock(
-                returncode=0, stdout=json.dumps(mock_response).encode()
-            ),
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
         ):
             result = await client.list_sessions(project="test-project", status="running")
 
@@ -165,19 +161,13 @@ class TestACPClient:
     @pytest.mark.asyncio
     async def test_list_sessions_with_limit(self, client: ACPClient) -> None:
         """Test session listing with limit."""
-        mock_response = {
-            "items": [
-                {"metadata": {"name": f"session-{i}"}} for i in range(10)
-            ]
-        }
+        mock_response = {"items": [{"metadata": {"name": f"session-{i}"}} for i in range(10)]}
 
         with patch.object(
             client,
             "_run_oc_command",
             new_callable=AsyncMock,
-            return_value=MagicMock(
-                returncode=0, stdout=json.dumps(mock_response).encode()
-            ),
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
         ):
             result = await client.list_sessions(project="test-project", limit=5)
 
@@ -194,9 +184,7 @@ class TestACPClient:
             new_callable=AsyncMock,
             return_value=MagicMock(returncode=0, stderr=b""),
         ):
-            result = await client.delete_session(
-                project="test-project", session="test-session"
-            )
+            result = await client.delete_session(project="test-project", session="test-session")
 
             assert result["deleted"] is True
             assert "Successfully deleted" in result["message"]
@@ -213,9 +201,7 @@ class TestACPClient:
             client,
             "_run_oc_command",
             new_callable=AsyncMock,
-            return_value=MagicMock(
-                returncode=0, stdout=json.dumps(mock_session).encode()
-            ),
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_session).encode()),
         ):
             result = await client.delete_session(
                 project="test-project", session="test-session", dry_run=True
@@ -246,9 +232,7 @@ class TestACPClient:
                 MagicMock(returncode=0, stderr=b""),
             ]
 
-            result = await client.restart_session(
-                project="test-project", session="test-session"
-            )
+            result = await client.restart_session(project="test-project", session="test-session")
 
             assert result["status"] == "restarting"
             assert "Successfully restarted" in result["message"]
@@ -265,9 +249,7 @@ class TestACPClient:
             client,
             "_run_oc_command",
             new_callable=AsyncMock,
-            return_value=MagicMock(
-                returncode=0, stdout=json.dumps(mock_session).encode()
-            ),
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_session).encode()),
         ):
             result = await client.restart_session(
                 project="test-project", session="test-session", dry_run=True
@@ -282,9 +264,7 @@ class TestACPClient:
         """Test bulk session deletion."""
         sessions = ["session-1", "session-2", "session-3"]
 
-        with patch.object(
-            client, "delete_session", new_callable=AsyncMock
-        ) as mock_delete:
+        with patch.object(client, "delete_session", new_callable=AsyncMock) as mock_delete:
             # Simulate 2 successful and 1 failed deletion
             mock_delete.side_effect = [
                 {"deleted": True, "message": "Success"},
@@ -292,9 +272,7 @@ class TestACPClient:
                 {"deleted": False, "message": "Session not found"},
             ]
 
-            result = await client.bulk_delete_sessions(
-                project="test-project", sessions=sessions
-            )
+            result = await client.bulk_delete_sessions(project="test-project", sessions=sessions)
 
             assert len(result["deleted"]) == 2
             assert len(result["failed"]) == 1
@@ -313,9 +291,7 @@ class TestACPClient:
             # Both patches succeed
             mock_cmd.return_value = MagicMock(returncode=0, stderr=b"")
 
-            result = await client.bulk_stop_sessions(
-                project="test-project", sessions=sessions
-            )
+            result = await client.bulk_stop_sessions(project="test-project", sessions=sessions)
 
             assert len(result["stopped"]) == 2
             assert len(result["failed"]) == 0
@@ -331,7 +307,9 @@ class TestACPClient:
             ]
         }
 
-        mock_logs = "2024-01-20 10:00:00 INFO Starting session\n2024-01-20 10:00:01 INFO Session ready\n"
+        mock_logs = (
+            "2024-01-20 10:00:00 INFO Starting session\n2024-01-20 10:00:01 INFO Session ready\n"
+        )
 
         with patch.object(
             client,
@@ -388,3 +366,103 @@ class TestACPClient:
             assert result["project"] == "test-workspace"
             assert result["token_valid"] is True
             assert result["authenticated"] is True
+
+
+class TestBulkSafety:
+    """Tests for bulk operation safety limits."""
+
+    def test_validate_bulk_operation_within_limit(self, client: ACPClient) -> None:
+        """Should pass with 3 or fewer items."""
+        client._validate_bulk_operation(["s1", "s2", "s3"], "delete")  # Should not raise
+
+    def test_validate_bulk_operation_exceeds_limit(self, client: ACPClient) -> None:
+        """Should raise ValueError with >3 items."""
+        with pytest.raises(ValueError, match="limited to 3 items"):
+            client._validate_bulk_operation(["s1", "s2", "s3", "s4"], "delete")
+
+
+class TestLabelOperations:
+    """Tests for label operations."""
+
+    @pytest.mark.asyncio
+    async def test_label_resource_success(self, client: ACPClient) -> None:
+        """Should label resource successfully."""
+        with patch.object(
+            client, "_run_oc_command", new_callable=AsyncMock, return_value=MagicMock(returncode=0)
+        ):
+            result = await client.label_resource(
+                "agenticsession",
+                "test-session",
+                "test-project",
+                labels={"env": "dev", "team": "api"},
+            )
+
+            assert result["labeled"] is True
+            assert result["labels"] == {"env": "dev", "team": "api"}
+
+    @pytest.mark.asyncio
+    async def test_label_resource_invalid_key(self, client: ACPClient) -> None:
+        """Should reject invalid label keys."""
+        with pytest.raises(ValueError, match="Invalid label key"):
+            await client.label_resource(
+                "agenticsession", "test", "test-project", labels={"bad key!": "value"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_unlabel_resource_success(self, client: ACPClient) -> None:
+        """Should remove labels successfully."""
+        with patch.object(
+            client, "_run_oc_command", new_callable=AsyncMock, return_value=MagicMock(returncode=0)
+        ):
+            result = await client.unlabel_resource(
+                "agenticsession", "test-session", "test-project", label_keys=["env", "team"]
+            )
+
+            assert result["unlabeled"] is True
+            assert result["removed_keys"] == ["env", "team"]
+
+    @pytest.mark.asyncio
+    async def test_bulk_label_resources(self, client: ACPClient) -> None:
+        """Should label multiple resources."""
+        with patch.object(client, "label_resource", new_callable=AsyncMock) as mock_label:
+            mock_label.return_value = {"labeled": True}
+
+            result = await client.bulk_label_resources(
+                "agenticsession", ["s1", "s2"], "test-project", labels={"env": "dev"}
+            )
+
+            assert len(result["labeled"]) == 2
+            assert len(result["failed"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_sessions_by_label(self, client: ACPClient) -> None:
+        """Should list sessions by label selector."""
+        mock_response = {"items": [{"metadata": {"name": "session-1"}}]}
+
+        with patch.object(
+            client,
+            "_run_oc_command",
+            new_callable=AsyncMock,
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
+        ):
+            result = await client.list_sessions_by_user_labels(
+                "test-project", labels={"env": "dev"}
+            )
+
+            assert result["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_by_label_exceeds_limit(self, client: ACPClient) -> None:
+        """Should reject when label selector matches >3 sessions."""
+        mock_response = {"items": [{"metadata": {"name": f"s{i}"}} for i in range(5)]}
+
+        with patch.object(
+            client,
+            "_run_oc_command",
+            new_callable=AsyncMock,
+            return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
+        ):
+            with pytest.raises(ValueError, match="Max 3 allowed"):
+                await client.bulk_delete_sessions_by_label(
+                    "test-project", labels={"cleanup": "true"}
+                )

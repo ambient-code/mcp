@@ -70,6 +70,19 @@ def format_bulk_result(result: Dict[str, Any], operation: str) -> str:
     """
     if result.get("dry_run"):
         output = "DRY RUN MODE - No changes made\n\n"
+
+        # Handle enhanced dry-run for label-based operations
+        if "matched_sessions" in result:
+            matched = result.get("matched_sessions", [])
+            output += f"Matched {result.get('matched_count', len(matched))} sessions with label selector:\n"
+            output += f"  {result.get('label_selector', 'N/A')}\n\n"
+            if matched:
+                output += "Matched sessions:\n"
+                for session in matched:
+                    output += f"  - {session}\n"
+            output += f"\n{result.get('message', '')}\n"
+            return output
+
         dry_run_info = result.get("dry_run_info", {})
 
         would_execute = dry_run_info.get("would_execute", [])
@@ -95,11 +108,21 @@ def format_bulk_result(result: Dict[str, Any], operation: str) -> str:
         return output
 
     # Normal mode
-    success_key = f"{operation}d" if operation in ["delete", "stop"] else operation
+    # Map operation to success key
+    success_key_map = {
+        "delete": "deleted",
+        "stop": "stopped",
+        "restart": "restarted",
+        "label": "labeled",
+        "unlabel": "unlabeled",
+    }
+    success_key = success_key_map.get(operation, operation)
     success = result.get(success_key, [])
     failed = result.get("failed", [])
 
-    output = f"Successfully {operation}d {len(success)} session(s)"
+    # Determine if we're working with sessions or resources
+    resource_type = "session(s)" if "session" in str(failed) else "resource(s)"
+    output = f"Successfully {operation}d {len(success)} {resource_type}"
 
     if success:
         output += ":\n"
@@ -124,10 +147,12 @@ def format_logs(result: Dict[str, Any]) -> str:
         Formatted string for display
     """
     if "error" in result:
-        error_msg = result['error']
+        error_msg = result["error"]
         # Check if this is an expected state rather than an error
         error_lower = error_msg.lower()
-        if any(phrase in error_lower for phrase in ["no pods found", "not found", "no running pods"]):
+        if any(
+            phrase in error_lower for phrase in ["no pods found", "not found", "no running pods"]
+        ):
             return f"No logs available: {error_msg}\n\nNote: This is expected for stopped sessions or sessions without active pods."
         return f"Error retrieving logs: {error_msg}"
 
@@ -215,10 +240,12 @@ def format_transcript(result: Dict[str, Any]) -> str:
         Formatted string for display
     """
     if "error" in result:
-        error_msg = result['error']
+        error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is an expected state (no transcript available)
-        if any(phrase in error_lower for phrase in ["no transcript", "transcript not found", "no data"]):
+        if any(
+            phrase in error_lower for phrase in ["no transcript", "transcript not found", "no data"]
+        ):
             return f"No transcript available: {error_msg}\n\nNote: Sessions may not have transcript data if they are newly created, stopped, or haven't processed messages yet."
         return f"Error retrieving transcript: {error_msg}"
 
@@ -248,7 +275,7 @@ def format_metrics(result: Dict[str, Any]) -> str:
         Formatted string for display
     """
     if "error" in result:
-        error_msg = result['error']
+        error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is an expected state (no metrics available)
         if any(phrase in error_lower for phrase in ["no transcript", "no data", "not found"]):
@@ -256,7 +283,7 @@ def format_metrics(result: Dict[str, Any]) -> str:
         return f"Error retrieving metrics: {error_msg}"
 
     output = "Session Metrics:\n\n"
-    message_count = result.get('message_count', 0)
+    message_count = result.get("message_count", 0)
 
     if message_count == 0:
         output += "No metrics available yet.\n\nNote: This session has no message history. Metrics will be available after the session processes messages."
@@ -286,10 +313,13 @@ def format_workflows(result: Dict[str, Any]) -> str:
         Formatted string for display
     """
     if "error" in result:
-        error_msg = result['error']
+        error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is an expected state (no workflows found)
-        if any(phrase in error_lower for phrase in ["no workflows", "not found", "no .github/workflows"]):
+        if any(
+            phrase in error_lower
+            for phrase in ["no workflows", "not found", "no .github/workflows"]
+        ):
             return f"No workflows found: {error_msg}\n\nNote: This repository may not have GitHub Actions workflows configured yet."
         return f"Error retrieving workflows: {error_msg}"
 
@@ -323,10 +353,12 @@ def format_export(result: Dict[str, Any]) -> str:
         Formatted string for display
     """
     if "error" in result:
-        error_msg = result['error']
+        error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is a partial export (some data unavailable)
-        if any(phrase in error_lower for phrase in ["no transcript", "no data", "partially exported"]):
+        if any(
+            phrase in error_lower for phrase in ["no transcript", "no data", "partially exported"]
+        ):
             return f"Partial export: {error_msg}\n\nNote: Some session data may be unavailable for stopped or inactive sessions. Exported data reflects what was accessible."
         return f"Error exporting session: {error_msg}"
 
@@ -340,7 +372,7 @@ def format_export(result: Dict[str, Any]) -> str:
     output += "\n\nMetadata:\n"
     output += json.dumps(data.get("metadata", {}), indent=2)
 
-    transcript = data.get('transcript', [])
+    transcript = data.get("transcript", [])
     transcript_count = len(transcript)
     output += f"\n\nTranscript: {transcript_count} messages"
 
