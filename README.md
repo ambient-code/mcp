@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for managing Ambient Code Platform (ACP) sessions on OpenShift/Kubernetes clusters.
 
+[Based on template-agent](https://github.com/redhat-data-and-ai/template-agent)
+
 ---
 
 ## Quick Start
@@ -10,7 +12,8 @@ Get started in 5 minutes:
 
 ```bash
 # Install
-pip install mcp-acp
+git clone https://github.com/ambient-code/mcp
+claude mcp add mcp-acp -t stdio mcp/mcp-acp-v0.1.0/mcp_acp-0.1.0-py3-none-any.whl
 
 # Configure
 mkdir -p ~/.config/acp
@@ -83,16 +86,13 @@ This MCP server provides 19 comprehensive tools for interacting with the Ambient
 
 ### From PyPI (when published)
 
-```bash
-pip install mcp-acp
-```
+
 
 ### From Source
 
 ```bash
-git clone <repo-url>
-cd mcp-acp
-pip install -e .
+git clone https://github.com/ambient-code/mcp
+claude mcp add mcp-acp -t stdio mcp/mcp_acp-0.1.0-py3-none-any.whl
 ```
 
 **Requirements:**
@@ -113,7 +113,7 @@ Create `~/.config/acp/clusters.yaml`:
 ```yaml
 clusters:
   vteam-stage:
-    server: https://api.vteam-stage.7fpc.p3.openshiftapps.com:443
+    server: https://api.vteam-stage.xxxx.p3.openshiftapps.com:443
     description: "V-Team Staging Environment"
     default_project: jeder-workspace
 
