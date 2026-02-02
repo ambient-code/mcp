@@ -13,7 +13,7 @@ Get started in 5 minutes:
 ```bash
 # Install
 git clone https://github.com/ambient-code/mcp
-claude mcp add mcp-acp -t stdio mcp/mcp-acp-v0.1.0/mcp_acp-0.1.0-py3-none-any.whl
+claude mcp add mcp-acp -t stdio mcp/dist/mcp_acp-*.whl
 
 # Configure
 mkdir -p ~/.config/acp
@@ -38,7 +38,7 @@ oc login --server=https://api.your-cluster.example.com:443
 }
 ```
 
-**First Command**: `Use acp_whoami to check my authentication`
+**First Command**: `List my ambient sessions that are older than a week`
 
 ---
 
@@ -121,7 +121,7 @@ This MCP server provides 27 comprehensive tools for interacting with the Ambient
 
 ```bash
 git clone https://github.com/ambient-code/mcp
-claude mcp add mcp-acp -t stdio mcp/mcp_acp-0.1.0-py3-none-any.whl
+pip install dist/mcp_acp-*.whl
 ```
 
 **Requirements:**
@@ -130,7 +130,7 @@ claude mcp add mcp-acp -t stdio mcp/mcp_acp-0.1.0-py3-none-any.whl
 - OpenShift CLI (`oc`) installed and in PATH
 - Access to an OpenShift cluster with ACP
 
-See [USAGE_GUIDE.md](USAGE_GUIDE.md) for detailed installation instructions.
+See [QUICKSTART.md](QUICKSTART.md) for detailed installation instructions.
 
 ---
 
@@ -185,91 +185,69 @@ Add the ACP server:
 oc login --server=https://api.your-cluster.example.com:443
 ```
 
+> **Note**: Direct OpenShift CLI authentication is required for testing until the frontend API is available (tracked in PR #558).
+
 ---
 
 ## Usage Examples
 
 ### List Sessions with Filtering
 
-```python
+```
 # List only running sessions
-acp_list_sessions(project="my-workspace", status="running")
+List running sessions in my-workspace
 
 # List sessions older than 7 days
-acp_list_sessions(project="my-workspace", older_than="7d")
+Show me sessions older than 7 days in my-workspace
 
 # List sessions by label
-acp_list_sessions(project="my-workspace", label_selector="env=test,team=qa")
+List sessions with env=test and team=qa labels in my-workspace
 
 # List sessions sorted by creation date
-acp_list_sessions(project="my-workspace", sort_by="created", limit=20)
+List sessions in my-workspace, sorted by creation date, limit 20
 ```
 
 ### Label Management
 
-```python
+```
 # Add labels to a session
-acp_label_resource(
-    resource_type="agenticsession",
-    name="my-session",
-    project="my-workspace",
-    labels={"env": "test", "team": "qa"}
-)
+Add env=test and team=qa labels to my-session in my-workspace
 
 # List sessions by label
-acp_list_sessions_by_label(
-    project="my-workspace",
-    labels={"env": "test"}
-)
+List sessions with env=test label in my-workspace
 
 # Bulk delete sessions by label
-acp_bulk_delete_sessions_by_label(
-    project="my-workspace",
-    label_selector="env=test",
-    dry_run=True  # Preview first
-)
+Delete all sessions with env=test label in my-workspace (dry-run first)
 ```
 
 ### Delete Session with Dry-Run
 
-```python
+```
 # Preview what would be deleted
-acp_delete_session(project="my-workspace", session="test-session", dry_run=True)
+Delete test-session from my-workspace in dry-run mode
 
 # Actually delete
-acp_delete_session(project="my-workspace", session="test-session")
+Delete test-session from my-workspace
 ```
 
 ### Bulk Operations
 
-```python
+```
 # Stop multiple sessions
-acp_bulk_stop_sessions(
-    project="my-workspace",
-    sessions=["session-1", "session-2", "session-3"]
-)
+Stop session-1, session-2, and session-3 in my-workspace
 
 # Delete old sessions with dry-run
-acp_bulk_delete_sessions(
-    project="my-workspace",
-    sessions=["old-session-1", "old-session-2"],
-    dry_run=True
-)
+Delete old-session-1 and old-session-2 from my-workspace in dry-run mode
 ```
 
 ### Get Session Logs
 
-```python
+```
 # Get logs from runner container
-acp_get_session_logs(
-    project="my-workspace",
-    session="debug-session",
-    container="runner",
-    tail_lines=100
-)
+Get logs from debug-session in my-workspace, runner container, last 100 lines
 ```
 
-See [USAGE_GUIDE.md](USAGE_GUIDE.md) for 40+ detailed examples and workflow patterns.
+See [QUICKSTART.md](QUICKSTART.md) for detailed examples and workflow patterns.
 
 ---
 
@@ -316,7 +294,7 @@ The server is built using:
 - **Async I/O**: Non-blocking operations for performance
 - **YAML Configuration**: Flexible cluster management
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for complete system design.
+See [CLAUDE.md](CLAUDE.md#architecture-overview) for complete system design.
 
 ---
 
@@ -365,18 +343,17 @@ mypy src/
 make check
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for contributing guidelines.
+See [CLAUDE.md](CLAUDE.md#development-commands) for contributing guidelines.
 
 ---
 
 ## Documentation
 
-- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Complete usage guide with examples
-- **[API_REFERENCE.md](API_REFERENCE.md)** - Full API specifications for all 19 tools
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
+- **[QUICKSTART.md](QUICKSTART.md)** - Complete usage guide with examples
+- **[API_REFERENCE.md](API_REFERENCE.md)** - Full API specifications for all 27 tools
+- **[CLAUDE.md](CLAUDE.md)** - System architecture and design
 - **[SECURITY.md](SECURITY.md)** - Security features and best practices
-- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development and contributing guide
-- **[CLEANROOM_SPEC.md](CLEANROOM_SPEC.md)** - Re-implementation specification
+- **[CLAUDE.md](CLAUDE.md)** - Development and contributing guide
 
 ---
 
@@ -405,7 +382,7 @@ Contributions are welcome! Please:
 5. Ensure code quality checks pass (`make check`)
 6. Submit a pull request
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed guidelines.
+See [CLAUDE.md](CLAUDE.md#development-commands) for detailed guidelines.
 
 ---
 
@@ -421,7 +398,7 @@ For issues and feature requests, please use the [GitHub issue tracker](https://g
 
 For usage questions, see:
 
-- [USAGE_GUIDE.md](USAGE_GUIDE.md) - Complete usage guide
+- [QUICKSTART.md](QUICKSTART.md) - Complete usage guide
 - [API_REFERENCE.md](API_REFERENCE.md) - API specifications
 - [SECURITY.md](SECURITY.md) - Security features
 

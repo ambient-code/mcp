@@ -98,7 +98,7 @@
         Your browser does not support the video tag.
       </video>
       <p><strong>Session:</strong> 295-message | "our last session crashed... working on agentready repo"</p>
-      <p><strong>Tools:</strong> <code>acp_list_sessions(status="failed")</code>, <code>acp_get_session_transcript</code>, <code>acp_clone_session</code>, <code>acp_bulk_create_sessions</code>, <code>acp_get_session_metrics</code>, <code>acp_bulk_stop_sessions</code></p>
+      <p><strong>Tools:</strong> List failed sessions, get transcript from crashed session, clone session to resume work, bulk create parallel sessions, get session metrics, bulk stop sessions</p>
       <p>Session crashed after analyzing 6/13 features → List failed → Get transcript (295 msgs) → Clone → Bulk create 7 parallel sessions → Monitor metrics (73% complete) → Bulk stop.</p>
       <p><strong>Impact:</strong> 72% time reduction (3h → 50min). Shows real crash recovery, parallelization (7 concurrent sessions), and multi-agent orchestration.</p>
     </td>
@@ -162,12 +162,14 @@ All based on real workflows, not synthetic examples.
 ## Terminal Configuration
 
 **Install Font:**
+
 ```bash
 brew install --cask font-ibm-plex-mono  # macOS
 # Or: https://github.com/IBM/plex/releases
 ```
 
 **iTerm2 Setup:**
+
 - Font: IBM Plex Mono 14pt, spacing 1.0, line 1.33
 - Colors: Background `#000000`, Foreground `#ffffff`
 - Window: 108 cols × 35 rows, 0% transparency
@@ -175,11 +177,13 @@ brew install --cask font-ibm-plex-mono  # macOS
 ## Recording Commands
 
 **Record:**
+
 ```bash
 asciinema rec demo.cast --cols 108 --rows 35 -c "./demo.sh" --overwrite
 ```
 
 **Convert:**
+
 ```bash
 brew install agg
 agg --theme config.json demo.cast demo.gif

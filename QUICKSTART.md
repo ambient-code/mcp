@@ -44,7 +44,7 @@ exec $SHELL
 pip install mcp-acp
 
 # Or install from wheel
-pip install dist/mcp_acp-0.1.0-py3-none-any.whl
+pip install dist/mcp_acp-*.whl
 
 # Or install from source
 pip install .
@@ -69,6 +69,7 @@ default_cluster: my-cluster
 ```
 
 **Important**: Replace with your actual:
+
 - Cluster API server URL
 - Default project/namespace name
 
@@ -86,6 +87,8 @@ oc login --server=https://api.your-cluster.example.com:6443 \
 # Option 3: Web authentication
 oc login --web
 ```
+
+> **Note**: Direct OpenShift CLI authentication is required for testing until the frontend API is available (tracked in PR #558).
 
 **Get your token**: In OpenShift web console → Click your username → Copy login command → Show token
 
@@ -151,6 +154,7 @@ Use acp_whoami to check my authentication status
 ```
 
 **Expected Output:**
+
 ```
 Current Authentication Status:
 
@@ -240,11 +244,13 @@ Restart my-session in my-workspace
 The installation script should have installed it. If not:
 
 **macOS**:
+
 ```bash
 brew install openshift-cli
 ```
 
 **Linux**:
+
 ```bash
 curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | \
   tar -xz -C /tmp && \
@@ -256,11 +262,13 @@ curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/opensh
 Add Python user bin to PATH:
 
 **macOS**:
+
 ```bash
 export PATH="$HOME/Library/Python/3.*/bin:$PATH"
 ```
 
 **Linux**:
+
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -278,10 +286,12 @@ oc login --server=https://your-cluster:6443
 ### "error: the server doesn't have a resource type 'agenticsession'"
 
 Either:
+
 1. Your cluster doesn't have ACP installed
 2. You're in the wrong project/namespace
 
 Check available projects:
+
 ```bash
 oc projects
 ```
@@ -307,26 +317,31 @@ chmod 700 ~/.config/acp
 ## Available Tools (19 Total)
 
 ### Core Session Management
+
 - `acp_list_sessions` - List/filter sessions
 - `acp_delete_session` - Delete with dry-run
 - `acp_restart_session` - Restart stopped sessions
 
 ### Bulk Operations
+
 - `acp_bulk_delete_sessions` - Delete multiple
 - `acp_bulk_stop_sessions` - Stop multiple
 
 ### Debugging
+
 - `acp_get_session_logs` - Get container logs
 - `acp_get_session_transcript` - Get conversation history
 - `acp_get_session_metrics` - Usage statistics
 
 ### Advanced Features
+
 - `acp_clone_session` - Clone configurations
 - `acp_update_session` - Update metadata
 - `acp_export_session` - Export session data
 - `acp_create_session_from_template` - Create from template
 
 ### Cluster Management
+
 - `acp_list_clusters` - List configured clusters
 - `acp_whoami` - Check authentication
 - `acp_login` - Web authentication
@@ -334,6 +349,7 @@ chmod 700 ~/.config/acp
 - `acp_add_cluster` - Add new cluster
 
 ### Workflows
+
 - `acp_list_workflows` - Discover workflows
 
 ---
@@ -398,6 +414,7 @@ A: Yes! The Python API can be used programmatically. See `USAGE_GUIDE.md` for ex
 ### Contributing
 
 See **DEVELOPMENT.md** for:
+
 - Development setup
 - Testing guidelines
 - Code quality standards
@@ -425,6 +442,7 @@ See **DEVELOPMENT.md** for:
 ## Summary
 
 You now have:
+
 - ✅ MCP ACP Server installed
 - ✅ OpenShift CLI configured
 - ✅ Cluster authentication set up
@@ -473,7 +491,7 @@ For local wheel (before PyPI publish):
       "command": "uvx",
       "args": [
         "--from",
-        "/full/path/to/dist/mcp_acp-0.1.0-py3-none-any.whl",
+        "/full/path/to/dist/mcp_acp-*.whl",
         "mcp-acp"
       ]
     }
@@ -489,4 +507,3 @@ For local wheel (before PyPI publish):
 - 🚀 **Auto-caching** - subsequent runs are instant
 
 See `UVX_USAGE.md` for complete uvx documentation.
-
