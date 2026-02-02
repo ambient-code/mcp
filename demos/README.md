@@ -31,7 +31,8 @@
   <tr>
     <td width="50%">
       <h4>📋 Demo 1: Discovery (~15s)</h4>
-      <video width="100%" controls poster="demo-1-discovery.png">
+      <img src="demo-1-discovery.png" alt="Demo 1: Discovery" width="100%">
+      <video width="100%" controls>
         <source src="demo-1-discovery.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -40,7 +41,8 @@
     </td>
     <td width="50%">
       <h4>🔄 Demo 2: Lifecycle (~20s)</h4>
-      <video width="100%" controls poster="demo-2-lifecycle.png">
+      <img src="demo-2-lifecycle.png" alt="Demo 2: Lifecycle" width="100%">
+      <video width="100%" controls>
         <source src="demo-2-lifecycle.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -51,7 +53,8 @@
   <tr>
     <td width="50%">
       <h4>🔍 Demo 3: Investigation (~18s)</h4>
-      <video width="100%" controls poster="demo-3-investigation.png">
+      <img src="demo-3-investigation.png" alt="Demo 3: Investigation" width="100%">
+      <video width="100%" controls>
         <source src="demo-3-investigation.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -60,7 +63,8 @@
     </td>
     <td width="50%">
       <h4>⚠️ Demo 4: Delete Workaround (~12s)</h4>
-      <video width="100%" controls poster="demo-4-missing-delete.png">
+      <img src="demo-4-missing-delete.png" alt="Demo 4: Delete Workaround" width="100%">
+      <video width="100%" controls>
         <source src="demo-4-missing-delete.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -76,7 +80,8 @@
   <tr>
     <td width="50%">
       <h4>⚡ Demo 5: Session Templates (~25s)</h4>
-      <video width="100%" controls poster="demo-5-session-template.png">
+      <img src="demo-5-session-template.png" alt="Demo 5: Session Templates" width="100%">
+      <video width="100%" controls>
         <source src="demo-5-session-template.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -87,7 +92,8 @@
     </td>
     <td width="50%">
       <h4>⭐ Demo 6: Crash Recovery + Bulk Operations (~45s)</h4>
-      <video width="100%" controls poster="demo-6-crash-recovery.png">
+      <img src="demo-6-crash-recovery.png" alt="Demo 6: Crash Recovery" width="100%">
+      <video width="100%" controls>
         <source src="demo-6-crash-recovery.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -100,7 +106,8 @@
   <tr>
     <td width="50%">
       <h4>📊 Demo 7: Metrics & Export (~35s)</h4>
-      <video width="100%" controls poster="demo-7-metrics-export.png">
+      <img src="demo-7-metrics-export.png" alt="Demo 7: Metrics & Export" width="100%">
+      <video width="100%" controls>
         <source src="demo-7-metrics-export.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -111,7 +118,8 @@
     </td>
     <td width="50%">
       <h4>🔀 Demo 8: Multi-Provider Comparison (~30s)</h4>
-      <video width="100%" controls poster="demo-8-bulk-comparison.png">
+      <img src="demo-8-bulk-comparison.png" alt="Demo 8: Multi-Provider Comparison" width="100%">
+      <video width="100%" controls>
         <source src="demo-8-bulk-comparison.mp4" type="video/mp4">
         Your browser does not support the video tag.
       </video>
