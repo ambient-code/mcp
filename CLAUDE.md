@@ -7,6 +7,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Self-Review Protocol (Mandatory)
+
+Before presenting ANY work containing code, analysis, or recommendations:
+
+1. **Pause and re-read your work**
+2. **Ask yourself:**
+   - "What would a senior engineer critique?"
+   - "What edge case am I missing?"
+   - "Is this actually correct?"
+   - "Are there security issues?" (injection, validation, secrets)
+   - "Is the reasoning complete?"
+3. **Fix issues before responding**
+4. **Note significant fixes**: "Self-review: [what you caught]"
+
+### What to Check
+
+**For code-related work:**
+- Edge cases handled?
+- Input validation present?
+- Error handling complete?
+- Security issues (OWASP Top 10)?
+- Tests cover the changes?
+
+**For analysis/planning work:**
+- Reasoning complete?
+- Assumptions stated?
+- Alternatives considered?
+- Risks identified?
+
+---
+
 ## Development Commands
 
 ### Linting and Testing (Pre-Commit)
@@ -43,7 +74,7 @@ python -m mcp_acp.server
 ### Three-Layer Design
 
 **1. MCP Server Layer (`server.py`)**
-- Exposes 28 MCP tools via stdio protocol
+- Exposes 27 MCP tools via stdio protocol
 - Schema-driven tool definitions using `SCHEMA_FRAGMENTS`
 - Dispatch table maps tool names to (handler, formatter) pairs
 - Server-layer confirmation enforcement for destructive bulk operations
