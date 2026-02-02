@@ -44,11 +44,12 @@ oc login --server=https://api.your-cluster.example.com:443
 
 ## Overview
 
-This MCP server provides 19 comprehensive tools for interacting with the Ambient Code Platform, enabling:
+This MCP server provides 27 comprehensive tools for interacting with the Ambient Code Platform, enabling:
 
 - **Session Management**: List, create, delete, restart, clone sessions
+- **Label Management**: Tag and organize sessions with custom labels
 - **Bulk Operations**: Efficiently manage multiple sessions at once
-- **Advanced Filtering**: Filter by status, age, display name, and more
+- **Advanced Filtering**: Filter by status, age, display name, labels, and more
 - **Debugging**: Retrieve logs, transcripts, and metrics
 - **Cluster Management**: Multi-cluster support with easy switching
 - **Safety First**: Dry-run mode on all mutating operations
@@ -59,34 +60,62 @@ This MCP server provides 19 comprehensive tools for interacting with the Ambient
 
 ## Features
 
-- **acp_add_cluster**: Add new cluster configurations
-- **acp_bulk_delete_sessions**: Delete multiple sessions at once
-- **acp_bulk_stop_sessions**: Stop multiple running sessions
+### Session Management
+
+- **acp_list_sessions**: Enhanced filtering by status, display name, age, labels, and sorting
+- **acp_delete_session**: Delete sessions with dry-run preview
+- **acp_restart_session**: Restart stopped sessions
 - **acp_clone_session**: Clone existing session configurations
 - **acp_create_session_from_template**: Create sessions from predefined templates
-- **acp_delete_session**: Delete sessions with dry-run preview
-- **acp_export_session**: Export session data for archival
-- **acp_get_session_logs**: Retrieve container logs for debugging
-- **acp_get_session_metrics**: Get usage statistics and analytics
-- **acp_get_session_transcript**: Retrieve conversation history
-- **acp_list_clusters**: List configured cluster aliases
-- **acp_list_sessions**: Enhanced filtering by status, display name, age, and sorting
-- **acp_list_workflows**: Discover available workflows
-- **acp_login**: Web-based authentication flow
-- **acp_restart_session**: Restart stopped sessions
-- **acp_switch_cluster**: Switch between configured clusters
 - **acp_update_session**: Update session metadata
-- **acp_whoami**: Check authentication status
 
-**Dry-Run Mode**: All mutating operations support a `dry_run` parameter for safe preview before executing.
+### Label Management
+
+- **acp_label_resource**: Add labels to sessions or other resources
+- **acp_unlabel_resource**: Remove labels from resources
+- **acp_bulk_label_resources**: Label multiple resources (max 3 with confirmation)
+- **acp_bulk_unlabel_resources**: Remove labels from multiple resources
+- **acp_list_sessions_by_label**: List sessions matching label selectors
+
+### Bulk Operations
+
+- **acp_bulk_delete_sessions**: Delete multiple sessions with confirmation
+- **acp_bulk_stop_sessions**: Stop multiple running sessions with confirmation
+- **acp_bulk_delete_sessions_by_label**: Delete sessions by label selector
+- **acp_bulk_stop_sessions_by_label**: Stop sessions by label selector
+- **acp_bulk_restart_sessions**: Restart multiple sessions (max 3)
+- **acp_bulk_restart_sessions_by_label**: Restart sessions by label selector
+
+### Debugging & Monitoring
+
+- **acp_get_session_logs**: Retrieve container logs for debugging
+- **acp_get_session_transcript**: Retrieve conversation history
+- **acp_get_session_metrics**: Get usage statistics and analytics
+- **acp_export_session**: Export session data for archival
+
+### Cluster Management
+
+- **acp_list_clusters**: List configured cluster aliases
+- **acp_whoami**: Check authentication status
+- **acp_login**: Web-based authentication flow
+- **acp_switch_cluster**: Switch between configured clusters
+- **acp_add_cluster**: Add new cluster configurations
+
+### Workflows
+
+- **acp_list_workflows**: Discover available workflows
+
+**Safety Features**:
+
+- **Dry-Run Mode**: All mutating operations support a `dry_run` parameter for safe preview before executing
+- **Bulk Operation Limits**: Maximum 3 items per bulk operation with confirmation requirement
+- **Label Format**: `acp.ambient-code.ai/label-{key}={value}` for Kubernetes compatibility
 
 ---
 
 ## Installation
 
 ### From PyPI (when published)
-
-
 
 ### From Source
 
@@ -96,6 +125,7 @@ claude mcp add mcp-acp -t stdio mcp/mcp_acp-0.1.0-py3-none-any.whl
 ```
 
 **Requirements:**
+
 - Python 3.10+
 - OpenShift CLI (`oc`) installed and in PATH
 - Access to an OpenShift cluster with ACP
@@ -168,8 +198,36 @@ acp_list_sessions(project="my-workspace", status="running")
 # List sessions older than 7 days
 acp_list_sessions(project="my-workspace", older_than="7d")
 
+# List sessions by label
+acp_list_sessions(project="my-workspace", label_selector="env=test,team=qa")
+
 # List sessions sorted by creation date
 acp_list_sessions(project="my-workspace", sort_by="created", limit=20)
+```
+
+### Label Management
+
+```python
+# Add labels to a session
+acp_label_resource(
+    resource_type="agenticsession",
+    name="my-session",
+    project="my-workspace",
+    labels={"env": "test", "team": "qa"}
+)
+
+# List sessions by label
+acp_list_sessions_by_label(
+    project="my-workspace",
+    labels={"env": "test"}
+)
+
+# Bulk delete sessions by label
+acp_bulk_delete_sessions_by_label(
+    project="my-workspace",
+    label_selector="env=test",
+    dry_run=True  # Preview first
+)
 ```
 
 ### Delete Session with Dry-Run
@@ -221,32 +279,38 @@ For complete API specifications, see [API_REFERENCE.md](API_REFERENCE.md).
 
 ### Quick Reference
 
-| Tool | Description |
-|------|-------------|
-| `acp_list_sessions` | List/filter sessions with advanced options |
-| `acp_delete_session` | Delete session with dry-run support |
-| `acp_restart_session` | Restart stopped sessions |
-| `acp_bulk_delete_sessions` | Delete multiple sessions |
-| `acp_bulk_stop_sessions` | Stop multiple sessions |
-| `acp_get_session_logs` | Get container logs |
-| `acp_list_clusters` | List configured clusters |
-| `acp_whoami` | Check authentication status |
-| `acp_clone_session` | Clone session configuration |
-| `acp_get_session_transcript` | Get conversation history |
-| `acp_update_session` | Update session metadata |
-| `acp_export_session` | Export session data |
-| `acp_get_session_metrics` | Get usage statistics |
-| `acp_list_workflows` | Discover workflows |
-| `acp_create_session_from_template` | Create from template |
-| `acp_login` | Authenticate to cluster |
-| `acp_switch_cluster` | Switch cluster context |
-| `acp_add_cluster` | Add cluster to config |
+| Category | Tool | Description |
+|----------|------|-------------|
+| **Session** | `acp_list_sessions` | List/filter sessions with advanced options |
+| | `acp_delete_session` | Delete session with dry-run support |
+| | `acp_restart_session` | Restart stopped sessions |
+| | `acp_clone_session` | Clone session configuration |
+| | `acp_update_session` | Update session metadata |
+| **Labels** | `acp_label_resource` | Add labels to sessions |
+| | `acp_unlabel_resource` | Remove labels from sessions |
+| | `acp_list_sessions_by_label` | Find sessions by label |
+| **Bulk Ops** | `acp_bulk_delete_sessions` | Delete multiple sessions (max 3) |
+| | `acp_bulk_stop_sessions` | Stop multiple sessions (max 3) |
+| | `acp_bulk_restart_sessions` | Restart multiple sessions (max 3) |
+| | `acp_bulk_delete_sessions_by_label` | Delete sessions by label |
+| **Debug** | `acp_get_session_logs` | Get container logs |
+| | `acp_get_session_transcript` | Get conversation history |
+| | `acp_get_session_metrics` | Get usage statistics |
+| | `acp_export_session` | Export session data |
+| **Cluster** | `acp_list_clusters` | List configured clusters |
+| | `acp_whoami` | Check authentication status |
+| | `acp_login` | Authenticate to cluster |
+| | `acp_switch_cluster` | Switch cluster context |
+| | `acp_add_cluster` | Add cluster to config |
+| **Workflows** | `acp_list_workflows` | Discover available workflows |
+| | `acp_create_session_from_template` | Create from template |
 
 ---
 
 ## Architecture
 
 The server is built using:
+
 - **MCP SDK**: Standard MCP protocol implementation
 - **OpenShift CLI**: Underlying `oc` commands for ACP operations
 - **Async I/O**: Non-blocking operations for performance
@@ -356,6 +420,7 @@ MIT License - See LICENSE file for details
 For issues and feature requests, please use the [GitHub issue tracker](https://github.com/ambient-code/mcp/issues).
 
 For usage questions, see:
+
 - [USAGE_GUIDE.md](USAGE_GUIDE.md) - Complete usage guide
 - [API_REFERENCE.md](API_REFERENCE.md) - API specifications
 - [SECURITY.md](SECURITY.md) - Security features
@@ -368,6 +433,7 @@ For usage questions, see:
 **Tests**: ✅ All Passing (13/13 security tests)
 **Documentation**: ✅ Complete
 **Security**: ✅ Hardened with defense-in-depth
-**Tools**: ✅ 19 tools fully implemented
+**Tools**: ✅ 27 tools fully implemented
+**Features**: ✅ Label management, bulk operations, advanced filtering
 
 **Ready for production use** 🚀
