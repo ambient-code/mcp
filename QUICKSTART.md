@@ -489,4 +489,3 @@ For local wheel (before PyPI publish):
 - 🚀 **Auto-caching** - subsequent runs are instant
 
 See `UVX_USAGE.md` for complete uvx documentation.
-

@@ -1,10 +1,10 @@
 """Output formatters for MCP responses."""
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 
-def format_result(result: Dict[str, Any]) -> str:
+def format_result(result: dict[str, Any]) -> str:
     """Format a simple result dictionary.
 
     Args:
@@ -23,7 +23,7 @@ def format_result(result: Dict[str, Any]) -> str:
     return result.get("message", json.dumps(result, indent=2))
 
 
-def format_sessions_list(result: Dict[str, Any]) -> str:
+def format_sessions_list(result: dict[str, Any]) -> str:
     """Format sessions list with filtering info.
 
     Args:
@@ -58,7 +58,7 @@ def format_sessions_list(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_bulk_result(result: Dict[str, Any], operation: str) -> str:
+def format_bulk_result(result: dict[str, Any], operation: str) -> str:
     """Format bulk operation results.
 
     Args:
@@ -137,7 +137,7 @@ def format_bulk_result(result: Dict[str, Any], operation: str) -> str:
     return output
 
 
-def format_logs(result: Dict[str, Any]) -> str:
+def format_logs(result: dict[str, Any]) -> str:
     """Format session logs.
 
     Args:
@@ -150,9 +150,7 @@ def format_logs(result: Dict[str, Any]) -> str:
         error_msg = result["error"]
         # Check if this is an expected state rather than an error
         error_lower = error_msg.lower()
-        if any(
-            phrase in error_lower for phrase in ["no pods found", "not found", "no running pods"]
-        ):
+        if any(phrase in error_lower for phrase in ["no pods found", "not found", "no running pods"]):
             return f"No logs available: {error_msg}\n\nNote: This is expected for stopped sessions or sessions without active pods."
         return f"Error retrieving logs: {error_msg}"
 
@@ -163,7 +161,7 @@ def format_logs(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_clusters(result: Dict[str, Any]) -> str:
+def format_clusters(result: dict[str, Any]) -> str:
     """Format clusters list.
 
     Args:
@@ -199,7 +197,7 @@ def format_clusters(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_whoami(result: Dict[str, Any]) -> str:
+def format_whoami(result: dict[str, Any]) -> str:
     """Format whoami information.
 
     Args:
@@ -230,7 +228,7 @@ def format_whoami(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_transcript(result: Dict[str, Any]) -> str:
+def format_transcript(result: dict[str, Any]) -> str:
     """Format session transcript.
 
     Args:
@@ -243,9 +241,7 @@ def format_transcript(result: Dict[str, Any]) -> str:
         error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is an expected state (no transcript available)
-        if any(
-            phrase in error_lower for phrase in ["no transcript", "transcript not found", "no data"]
-        ):
+        if any(phrase in error_lower for phrase in ["no transcript", "transcript not found", "no data"]):
             return f"No transcript available: {error_msg}\n\nNote: Sessions may not have transcript data if they are newly created, stopped, or haven't processed messages yet."
         return f"Error retrieving transcript: {error_msg}"
 
@@ -265,7 +261,7 @@ def format_transcript(result: Dict[str, Any]) -> str:
         return output
 
 
-def format_metrics(result: Dict[str, Any]) -> str:
+def format_metrics(result: dict[str, Any]) -> str:
     """Format session metrics.
 
     Args:
@@ -303,7 +299,7 @@ def format_metrics(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_workflows(result: Dict[str, Any]) -> str:
+def format_workflows(result: dict[str, Any]) -> str:
     """Format workflows list.
 
     Args:
@@ -316,10 +312,7 @@ def format_workflows(result: Dict[str, Any]) -> str:
         error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is an expected state (no workflows found)
-        if any(
-            phrase in error_lower
-            for phrase in ["no workflows", "not found", "no .github/workflows"]
-        ):
+        if any(phrase in error_lower for phrase in ["no workflows", "not found", "no .github/workflows"]):
             return f"No workflows found: {error_msg}\n\nNote: This repository may not have GitHub Actions workflows configured yet."
         return f"Error retrieving workflows: {error_msg}"
 
@@ -343,7 +336,7 @@ def format_workflows(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_export(result: Dict[str, Any]) -> str:
+def format_export(result: dict[str, Any]) -> str:
     """Format session export data.
 
     Args:
@@ -356,9 +349,7 @@ def format_export(result: Dict[str, Any]) -> str:
         error_msg = result["error"]
         error_lower = error_msg.lower()
         # Check if this is a partial export (some data unavailable)
-        if any(
-            phrase in error_lower for phrase in ["no transcript", "no data", "partially exported"]
-        ):
+        if any(phrase in error_lower for phrase in ["no transcript", "no data", "partially exported"]):
             return f"Partial export: {error_msg}\n\nNote: Some session data may be unavailable for stopped or inactive sessions. Exported data reflects what was accessible."
         return f"Error exporting session: {error_msg}"
 
@@ -384,7 +375,7 @@ def format_export(result: Dict[str, Any]) -> str:
     return output
 
 
-def format_cluster_operation(result: Dict[str, Any]) -> str:
+def format_cluster_operation(result: dict[str, Any]) -> str:
     """Format cluster operation results (add, switch, login).
 
     Args:

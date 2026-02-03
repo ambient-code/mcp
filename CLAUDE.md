@@ -47,16 +47,21 @@ Before presenting ANY work containing code, analysis, or recommendations:
 uv venv
 uv pip install -e ".[dev]"
 
-# Complete pre-commit workflow
-uv run ruff format . && uv run ruff check . && uv run mypy src/mcp_acp && uv run pytest tests/
+# Install pre-commit hooks (recommended - runs automatically before each commit)
+pre-commit install
+
+# Complete pre-commit workflow (manual)
+uv run ruff format . && uv run ruff check . && uv run pytest tests/
 
 # Individual commands
 uv run ruff format .                       # Format code
 uv run ruff check .                        # Lint code
 uv run ruff check . --fix                  # Auto-fix linting issues
-uv run mypy src/mcp_acp                    # Type checking
 uv run pytest tests/                       # Run all tests
 uv run pytest tests/test_client.py::TestClass -v  # Run specific test class
+
+# Run all pre-commit hooks manually (without committing)
+pre-commit run --all-files
 ```
 
 ### Building and Installing
