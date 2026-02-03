@@ -43,28 +43,33 @@ Before presenting ANY work containing code, analysis, or recommendations:
 ### Linting and Testing (Pre-Commit)
 
 ```bash
+# One-time setup (if .venv doesn't exist)
+uv venv
+uv pip install -e ".[dev]"
+
 # Complete pre-commit workflow
-black . && isort . && flake8 . --ignore=E501,E203,W503 && pytest tests/
+uv run ruff format . && uv run ruff check . && uv run mypy src/mcp_acp && uv run pytest tests/
 
 # Individual commands
-black .                                     # Format code
-isort .                                     # Sort imports
-flake8 . --ignore=E501,E203,W503           # Lint (no line length enforcement)
-pytest tests/                              # Run all tests
-pytest tests/test_client.py::TestClass -v  # Run specific test class
+uv run ruff format .                       # Format code
+uv run ruff check .                        # Lint code
+uv run ruff check . --fix                  # Auto-fix linting issues
+uv run mypy src/mcp_acp                    # Type checking
+uv run pytest tests/                       # Run all tests
+uv run pytest tests/test_client.py::TestClass -v  # Run specific test class
 ```
 
 ### Building and Installing
 
 ```bash
-# Install in development mode
-uv pip install -e .
+# Install in development mode with dev dependencies
+uv pip install -e ".[dev]"
 
 # Build wheel
-python -m build
+uvx --from build pyproject-build --installer uv
 
 # Run MCP server locally
-python -m mcp_acp.server
+uv run python -m mcp_acp.server
 ```
 
 ---
@@ -490,9 +495,8 @@ MAX_LOG_LINES = 10000
 - `pytest>=7.0.0` - Testing framework
 - `pytest-asyncio>=0.21.0` - Async test support
 - `pytest-cov>=4.0.0` - Coverage reporting
-- `black` - Code formatting
-- `isort` - Import sorting
-- `flake8` - Linting (ignore E501, E203, W503)
+- `ruff>=0.12.0` - Code formatting and linting (replaces black, isort, flake8)
+- `mypy>=1.0.0` - Type checking
 
 **Runtime Requirement:**
 - OpenShift CLI (`oc`) must be installed and in PATH
