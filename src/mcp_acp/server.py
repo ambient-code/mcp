@@ -2,18 +2,29 @@
 
 import asyncio
 import os
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
+
 from utils.pylogger import get_python_logger
 
 from .client import ACPClient
-from .formatters import (format_bulk_result, format_cluster_operation,
-                         format_clusters, format_export, format_logs,
-                         format_metrics, format_result, format_sessions_list,
-                         format_transcript, format_whoami, format_workflows)
+from .formatters import (
+    format_bulk_result,
+    format_cluster_operation,
+    format_clusters,
+    format_export,
+    format_logs,
+    format_metrics,
+    format_result,
+    format_sessions_list,
+    format_transcript,
+    format_whoami,
+    format_workflows,
+)
 
 # Initialize structured logger
 logger = get_python_logger()
@@ -22,7 +33,7 @@ logger = get_python_logger()
 app = Server("mcp-acp")
 
 # Global client instance
-_client: Optional[ACPClient] = None
+_client: ACPClient | None = None
 
 # Schema fragments for reuse
 SCHEMA_FRAGMENTS = {
@@ -88,7 +99,7 @@ SCHEMA_FRAGMENTS = {
 }
 
 
-def create_tool_schema(properties: Dict[str, Any], required: list[str]) -> Dict[str, Any]:
+def create_tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     """Build tool input schema from property references.
 
     Args:
@@ -135,9 +146,7 @@ def get_client() -> ACPClient:
     return _client
 
 
-async def _check_confirmation_then_execute(
-    fn: Callable, args: Dict[str, Any], operation: str
-) -> Any:
+async def _check_confirmation_then_execute(fn: Callable, args: dict[str, Any], operation: str) -> Any:
     """Enforce confirmation at server layer (not client).
 
     Args:
@@ -152,9 +161,7 @@ async def _check_confirmation_then_execute(
         ValueError: If confirmation not provided for non-dry-run operations
     """
     if not args.get("dry_run") and not args.get("confirm"):
-        raise ValueError(
-            f"Bulk {operation} requires explicit confirmation.\n" f"Add confirm=true to proceed."
-        )
+        raise ValueError(f"Bulk {operation} requires explicit confirmation.\nAdd confirm=true to proceed.")
     return await fn(**args)
 
 
@@ -570,7 +577,7 @@ async def list_tools() -> list[Tool]:
 
 
 # Tool dispatch table: maps tool names to (handler, formatter) pairs
-def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callable]]:
+def create_dispatch_table(client: ACPClient) -> dict[str, tuple[Callable, Callable]]:
     """Create tool dispatch table.
 
     Args:
@@ -593,15 +600,11 @@ def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callab
             format_result,
         ),
         "acp_bulk_delete_sessions": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_delete_sessions, args, "delete"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_delete_sessions, args, "delete"),
             lambda r: format_bulk_result(r, "delete"),
         ),
         "acp_bulk_stop_sessions": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_stop_sessions, args, "stop"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_stop_sessions, args, "stop"),
             lambda r: format_bulk_result(r, "stop"),
         ),
         "acp_get_session_logs": (
@@ -626,15 +629,11 @@ def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callab
             format_result,
         ),
         "acp_bulk_label_resources": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_label_resources, args, "label"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_label_resources, args, "label"),
             lambda r: format_bulk_result(r, "label"),
         ),
         "acp_bulk_unlabel_resources": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_unlabel_resources, args, "unlabel"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_unlabel_resources, args, "unlabel"),
             lambda r: format_bulk_result(r, "unlabel"),
         ),
         "acp_list_sessions_by_label": (
@@ -642,27 +641,19 @@ def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callab
             format_sessions_list,
         ),
         "acp_bulk_delete_sessions_by_label": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_delete_sessions_by_label, args, "delete"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_delete_sessions_by_label, args, "delete"),
             lambda r: format_bulk_result(r, "delete"),
         ),
         "acp_bulk_stop_sessions_by_label": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_stop_sessions_by_label, args, "stop"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_stop_sessions_by_label, args, "stop"),
             lambda r: format_bulk_result(r, "stop"),
         ),
         "acp_bulk_restart_sessions": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_restart_sessions, args, "restart"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_restart_sessions, args, "restart"),
             lambda r: format_bulk_result(r, "restart"),
         ),
         "acp_bulk_restart_sessions_by_label": (
-            lambda **args: _check_confirmation_then_execute(
-                client.bulk_restart_sessions_by_label, args, "restart"
-            ),
+            lambda **args: _check_confirmation_then_execute(client.bulk_restart_sessions_by_label, args, "restart"),
             lambda r: format_bulk_result(r, "restart"),
         ),
         # P2 Tools
@@ -712,7 +703,7 @@ def create_dispatch_table(client: ACPClient) -> Dict[str, Tuple[Callable, Callab
 
 
 @app.call_tool()
-async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls with dispatch table.
 
     Args:
@@ -749,9 +740,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
                 default_project = cluster_config.get("default_project")
                 if default_project:
                     arguments["project"] = default_project
-                    logger.info(
-                        "project_autofilled", project=default_project, cluster=default_cluster
-                    )
+                    logger.info("project_autofilled", project=default_project, cluster=default_cluster)
 
         # Call handler (async or sync)
         if asyncio.iscoroutinefunction(handler):
@@ -775,11 +764,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[TextContent]:
     except ValueError as e:
         # Validation errors - these are expected for invalid input
         elapsed = time.time() - start_time
-        logger.warning(
-            "tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e)
-        )
+        logger.warning("tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
         return [TextContent(type="text", text=f"Validation Error: {str(e)}")]
-    except asyncio.TimeoutError as e:
+    except TimeoutError as e:
         elapsed = time.time() - start_time
         logger.error("tool_timeout", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
         return [TextContent(type="text", text=f"Timeout Error: {str(e)}")]

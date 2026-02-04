@@ -1,6 +1,7 @@
 """Security tests for MCP ACP Server."""
 
 import pytest
+
 from mcp_acp.client import ACPClient
 
 
@@ -29,16 +30,16 @@ class TestInputValidation:
 
         invalid_names = [
             "Test-Session",  # uppercase
-            "my_project",     # underscore
-            "session.name",   # dot
-            "session name",   # space
-            "session;name",   # semicolon
+            "my_project",  # underscore
+            "session.name",  # dot
+            "session name",  # space
+            "session;name",  # semicolon
             "../../../etc/passwd",  # path traversal
-            "session|name",   # pipe
-            "session&name",   # ampersand
-            "-starts-dash",   # starts with dash
-            "ends-dash-",     # ends with dash
-            "a" * 254,        # too long
+            "session|name",  # pipe
+            "session&name",  # ampersand
+            "-starts-dash",  # starts with dash
+            "ends-dash-",  # ends with dash
+            "a" * 254,  # too long
         ]
 
         for name in invalid_names:
@@ -50,13 +51,8 @@ class TestInputValidation:
         # Valid config should pass
         client = ACPClient()
         client.config = {
-            "clusters": {
-                "test": {
-                    "server": "https://api.example.com:6443",
-                    "description": "Test cluster"
-                }
-            },
-            "default_cluster": "test"
+            "clusters": {"test": {"server": "https://api.example.com:6443", "description": "Test cluster"}},
+            "default_cluster": "test",
         }
         client._validate_config()  # Should not raise
 
@@ -76,13 +72,7 @@ class TestInputValidation:
     def test_config_validation_missing_server(self):
         """Test that missing server field is rejected."""
         client = ACPClient()
-        client.config = {
-            "clusters": {
-                "test": {
-                    "description": "Missing server"
-                }
-            }
-        }
+        client.config = {"clusters": {"test": {"description": "Missing server"}}}
         with pytest.raises(ValueError, match="missing 'server' field"):
             client._validate_config()
 
@@ -159,7 +149,7 @@ class TestResourceLimits:
         client = ACPClient()
 
         # Should have a max command timeout
-        assert hasattr(client, 'MAX_COMMAND_TIMEOUT')
+        assert hasattr(client, "MAX_COMMAND_TIMEOUT")
         assert client.MAX_COMMAND_TIMEOUT > 0
         assert client.MAX_COMMAND_TIMEOUT <= 600  # Not more than 10 minutes
 

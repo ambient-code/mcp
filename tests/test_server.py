@@ -255,9 +255,7 @@ class TestServerTools:
     async def test_call_tool_delete_session(self) -> None:
         """Test calling delete session tool."""
         mock_client = MagicMock()
-        mock_client.delete_session = AsyncMock(
-            return_value={"deleted": True, "message": "Success"}
-        )
+        mock_client.delete_session = AsyncMock(return_value={"deleted": True, "message": "Success"})
 
         with patch("mcp_acp.server.get_client", return_value=mock_client):
             result = await call_tool(
@@ -305,9 +303,7 @@ class TestServerTools:
     async def test_call_tool_restart_session(self) -> None:
         """Test calling restart session tool."""
         mock_client = MagicMock()
-        mock_client.restart_session = AsyncMock(
-            return_value={"status": "restarting", "message": "Success"}
-        )
+        mock_client.restart_session = AsyncMock(return_value={"status": "restarting", "message": "Success"})
 
         with patch("mcp_acp.server.get_client", return_value=mock_client):
             result = await call_tool(
@@ -325,9 +321,7 @@ class TestServerTools:
     async def test_call_tool_bulk_delete(self) -> None:
         """Test calling bulk delete tool."""
         mock_client = MagicMock()
-        mock_client.bulk_delete_sessions = AsyncMock(
-            return_value={"deleted": ["s1", "s2"], "failed": []}
-        )
+        mock_client.bulk_delete_sessions = AsyncMock(return_value={"deleted": ["s1", "s2"], "failed": []})
 
         with patch("mcp_acp.server.get_client", return_value=mock_client):
             result = await call_tool(
@@ -345,9 +339,7 @@ class TestServerTools:
     async def test_call_tool_bulk_stop(self) -> None:
         """Test calling bulk stop tool."""
         mock_client = MagicMock()
-        mock_client.bulk_stop_sessions = AsyncMock(
-            return_value={"stopped": ["s1", "s2"], "failed": []}
-        )
+        mock_client.bulk_stop_sessions = AsyncMock(return_value={"stopped": ["s1", "s2"], "failed": []})
 
         with patch("mcp_acp.server.get_client", return_value=mock_client):
             result = await call_tool(

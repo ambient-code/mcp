@@ -59,3 +59,11 @@ clusters.yaml
 # Build artifacts
 *.whl
 *.tar.gz
+
+# Artifacts directory
+artifacts/
+# Development artifacts
+uv.lock
+CLEANUP-QUICKSTART.md
+README-CLEANUP.md
+cleanup-namespaces.sh

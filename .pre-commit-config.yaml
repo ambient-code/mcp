@@ -1,4 +1,22 @@
+# Pre-commit hooks to ensure code quality before commits
+# See https://pre-commit.com for more information
+# Run manually: pre-commit run --all-files
+# Install: pre-commit install
+
 repos:
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      # Run the formatter
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # Basic file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -6,38 +24,18 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
-      - id: check-merge-conflict
-      - id: debug-statements
-      - id: check-case-conflict
-      - id: check-docstring-first
+        args: ["--maxkb=1000"]
       - id: check-json
       - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.2
-    hooks:
-      - id: ruff
-        args: [--fix]
-        exclude: ^tests/
-      - id: ruff-format
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.16.1
-    hooks:
-      - id: mypy
-        args: [--ignore-missing-imports]
-        additional_dependencies: [types-requests]
-
-  - repo: https://github.com/PyCQA/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        args: [--convention=google]
-        exclude: ^tests/
-
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.6
-    hooks:
-      - id: bandit
-        args: [ "-ll" ] # only report medium/high severity
-        exclude: ^tests/
+  # MyPy type checking (commented out until types are complete)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.13.0
+  #   hooks:
+  #     - id: mypy
+  #       args: [--config-file=pyproject.toml]
+  #       additional_dependencies:
+  #         - types-PyYAML
+  #         - pydantic

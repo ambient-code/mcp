@@ -203,9 +203,7 @@ class TestACPClient:
             new_callable=AsyncMock,
             return_value=MagicMock(returncode=0, stdout=json.dumps(mock_session).encode()),
         ):
-            result = await client.delete_session(
-                project="test-project", session="test-session", dry_run=True
-            )
+            result = await client.delete_session(project="test-project", session="test-session", dry_run=True)
 
             assert result["deleted"] is False
             assert result["dry_run"] is True
@@ -251,9 +249,7 @@ class TestACPClient:
             new_callable=AsyncMock,
             return_value=MagicMock(returncode=0, stdout=json.dumps(mock_session).encode()),
         ):
-            result = await client.restart_session(
-                project="test-project", session="test-session", dry_run=True
-            )
+            result = await client.restart_session(project="test-project", session="test-session", dry_run=True)
 
             assert result["dry_run"] is True
             assert "Would restart" in result["message"]
@@ -307,9 +303,7 @@ class TestACPClient:
             ]
         }
 
-        mock_logs = (
-            "2024-01-20 10:00:00 INFO Starting session\n2024-01-20 10:00:01 INFO Session ready\n"
-        )
+        mock_logs = "2024-01-20 10:00:00 INFO Starting session\n2024-01-20 10:00:01 INFO Session ready\n"
 
         with patch.object(
             client,
@@ -323,9 +317,7 @@ class TestACPClient:
                 MagicMock(returncode=0, stdout=mock_logs.encode()),
             ]
 
-            result = await client.get_session_logs(
-                project="test-project", session="test-session", tail_lines=100
-            )
+            result = await client.get_session_logs(project="test-project", session="test-session", tail_lines=100)
 
             assert result["logs"] == mock_logs
             assert result["lines"] == 3  # Including trailing newline
@@ -387,9 +379,7 @@ class TestLabelOperations:
     @pytest.mark.asyncio
     async def test_label_resource_success(self, client: ACPClient) -> None:
         """Should label resource successfully."""
-        with patch.object(
-            client, "_run_oc_command", new_callable=AsyncMock, return_value=MagicMock(returncode=0)
-        ):
+        with patch.object(client, "_run_oc_command", new_callable=AsyncMock, return_value=MagicMock(returncode=0)):
             result = await client.label_resource(
                 "agenticsession",
                 "test-session",
@@ -404,16 +394,12 @@ class TestLabelOperations:
     async def test_label_resource_invalid_key(self, client: ACPClient) -> None:
         """Should reject invalid label keys."""
         with pytest.raises(ValueError, match="Invalid label key"):
-            await client.label_resource(
-                "agenticsession", "test", "test-project", labels={"bad key!": "value"}
-            )
+            await client.label_resource("agenticsession", "test", "test-project", labels={"bad key!": "value"})
 
     @pytest.mark.asyncio
     async def test_unlabel_resource_success(self, client: ACPClient) -> None:
         """Should remove labels successfully."""
-        with patch.object(
-            client, "_run_oc_command", new_callable=AsyncMock, return_value=MagicMock(returncode=0)
-        ):
+        with patch.object(client, "_run_oc_command", new_callable=AsyncMock, return_value=MagicMock(returncode=0)):
             result = await client.unlabel_resource(
                 "agenticsession", "test-session", "test-project", label_keys=["env", "team"]
             )
@@ -445,9 +431,7 @@ class TestLabelOperations:
             new_callable=AsyncMock,
             return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
         ):
-            result = await client.list_sessions_by_user_labels(
-                "test-project", labels={"env": "dev"}
-            )
+            result = await client.list_sessions_by_user_labels("test-project", labels={"env": "dev"})
 
             assert result["total"] == 1
 
@@ -463,6 +447,4 @@ class TestLabelOperations:
             return_value=MagicMock(returncode=0, stdout=json.dumps(mock_response).encode()),
         ):
             with pytest.raises(ValueError, match="Max 3 allowed"):
-                await client.bulk_delete_sessions_by_label(
-                    "test-project", labels={"cleanup": "true"}
-                )
+                await client.bulk_delete_sessions_by_label("test-project", labels={"cleanup": "true"})

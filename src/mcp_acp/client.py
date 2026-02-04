@@ -5,9 +5,10 @@ import json
 import re
 import secrets
 import subprocess
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
 import yaml
 
@@ -34,7 +35,7 @@ class ACPClient:
     MAX_COMMAND_TIMEOUT = 120  # Maximum command timeout in seconds
     MAX_LOG_LINES = 10000  # Maximum log lines to retrieve
 
-    def __init__(self, config_path: Optional[str] = None, settings: Optional[Settings] = None):
+    def __init__(self, config_path: str | None = None, settings: Settings | None = None):
         """Initialize ACP client.
 
         Args:
@@ -94,11 +95,9 @@ class ACPClient:
             raise ValueError(f"{field_name} exceeds maximum length of {max_length}")
         # Validate Kubernetes naming conventions (DNS-1123 subdomain)
         if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", value):
-            raise ValueError(
-                f"{field_name} contains invalid characters. Must match: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-            )
+            raise ValueError(f"{field_name} contains invalid characters. Must match: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 
-    def _validate_bulk_operation(self, items: List[str], operation_name: str) -> None:
+    def _validate_bulk_operation(self, items: list[str], operation_name: str) -> None:
         """Enforce 3-item limit for safety on bulk operations.
 
         Args:
@@ -116,11 +115,11 @@ class ACPClient:
 
     async def _run_oc_command(
         self,
-        args: List[str],
+        args: list[str],
         capture_output: bool = True,
         parse_json: bool = False,
-        timeout: Optional[int] = None,
-    ) -> Union[subprocess.CompletedProcess, Dict[str, Any]]:
+        timeout: int | None = None,
+    ) -> subprocess.CompletedProcess | dict[str, Any]:
         """Run an oc command asynchronously with security controls.
 
         Args:
@@ -155,9 +154,7 @@ class ACPClient:
                     stderr=asyncio.subprocess.PIPE,
                     # Security: Prevent shell injection
                 )
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=effective_timeout
-                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=effective_timeout)
                 result = subprocess.CompletedProcess(
                     args=cmd,
                     returncode=process.returncode or 0,
@@ -169,33 +166,29 @@ class ACPClient:
                     try:
                         return json.loads(result.stdout.decode())
                     except json.JSONDecodeError as e:
-                        raise ValueError(f"Failed to parse JSON response: {e}")
+                        raise ValueError(f"Failed to parse JSON response: {e}") from e
 
                 return result
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Kill the process if it times out
                 try:
                     process.kill()
                     await process.wait()
                 except Exception:
                     pass
-                raise asyncio.TimeoutError(f"Command timed out after {effective_timeout}s")
+                raise TimeoutError(f"Command timed out after {effective_timeout}s") from None
         else:
             # For non-captured output, use subprocess.run with timeout
             try:
                 result = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        subprocess.run, cmd, capture_output=False, timeout=effective_timeout
-                    ),
+                    asyncio.to_thread(subprocess.run, cmd, capture_output=False, timeout=effective_timeout),
                     timeout=effective_timeout + 5,  # Extra buffer
                 )
                 return result
             except subprocess.TimeoutExpired:
-                raise asyncio.TimeoutError(f"Command timed out after {effective_timeout}s")
+                raise TimeoutError(f"Command timed out after {effective_timeout}s") from None
 
-    async def _get_resource_json(
-        self, resource_type: str, name: str, namespace: str
-    ) -> Dict[str, Any]:
+    async def _get_resource_json(self, resource_type: str, name: str, namespace: str) -> dict[str, Any]:
         """Get a Kubernetes resource as JSON dict.
 
         Args:
@@ -216,9 +209,7 @@ class ACPClient:
         self._validate_input(name, "resource name")
         self._validate_input(namespace, "namespace")
 
-        result = await self._run_oc_command(
-            ["get", resource_type, name, "-n", namespace, "-o", "json"]
-        )
+        result = await self._run_oc_command(["get", resource_type, name, "-n", namespace, "-o", "json"])
 
         if result.returncode != 0:
             raise Exception(f"Failed to get {resource_type} '{name}': {result.stderr.decode()}")
@@ -226,8 +217,8 @@ class ACPClient:
         return json.loads(result.stdout.decode())
 
     async def _list_resources_json(
-        self, resource_type: str, namespace: str, selector: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, resource_type: str, namespace: str, selector: str | None = None
+    ) -> list[dict[str, Any]]:
         """List Kubernetes resources as JSON dicts.
 
         Args:
@@ -261,9 +252,7 @@ class ACPClient:
         data = json.loads(result.stdout.decode())
         return data.get("items", [])
 
-    async def _validate_session_for_dry_run(
-        self, project: str, session: str, operation: str
-    ) -> Dict[str, Any]:
+    async def _validate_session_for_dry_run(self, project: str, session: str, operation: str) -> dict[str, Any]:
         """Validate session exists for dry-run and return session info.
 
         Args:
@@ -298,11 +287,11 @@ class ACPClient:
     async def _bulk_operation(
         self,
         project: str,
-        sessions: List[str],
+        sessions: list[str],
         operation_fn: Callable,
         success_key: str,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generic bulk operation handler.
 
         Args:
@@ -358,9 +347,9 @@ class ACPClient:
         resource_type: str,
         name: str,
         project: str,
-        labels: Dict[str, str],
+        labels: dict[str, str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add/update labels on any resource (generic, works for sessions/workspaces/etc).
 
         Args:
@@ -401,9 +390,7 @@ class ACPClient:
 
         # Apply with --overwrite (handles add & update)
         label_args = [f"{k}={v}" for k, v in k8s_labels.items()]
-        result = await self._run_oc_command(
-            ["label", resource_type, name, "-n", project, "--overwrite"] + label_args
-        )
+        result = await self._run_oc_command(["label", resource_type, name, "-n", project, "--overwrite"] + label_args)
 
         if result.returncode == 0:
             return {"labeled": True, "resource": name, "labels": labels}
@@ -415,9 +402,9 @@ class ACPClient:
         resource_type: str,
         name: str,
         project: str,
-        label_keys: List[str],
+        label_keys: list[str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Remove specific labels from a resource.
 
         Args:
@@ -447,9 +434,7 @@ class ACPClient:
 
         # Remove labels using oc label with '-' suffix
         label_args = [f"{k}-" for k in prefixed_keys]
-        result = await self._run_oc_command(
-            ["label", resource_type, name, "-n", project] + label_args
-        )
+        result = await self._run_oc_command(["label", resource_type, name, "-n", project] + label_args)
 
         if result.returncode == 0:
             return {"unlabeled": True, "resource": name, "removed_keys": label_keys}
@@ -459,11 +444,11 @@ class ACPClient:
     async def bulk_label_resources(
         self,
         resource_type: str,
-        names: List[str],
+        names: list[str],
         project: str,
-        labels: Dict[str, str],
+        labels: dict[str, str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Label multiple resources with same labels (max 3).
 
         Args:
@@ -498,11 +483,11 @@ class ACPClient:
     async def bulk_unlabel_resources(
         self,
         resource_type: str,
-        names: List[str],
+        names: list[str],
         project: str,
-        label_keys: List[str],
+        label_keys: list[str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Remove labels from multiple resources (max 3).
 
         Args:
@@ -537,13 +522,13 @@ class ACPClient:
     async def list_sessions(
         self,
         project: str,
-        status: Optional[str] = None,
-        has_display_name: Optional[bool] = None,
-        older_than: Optional[str] = None,
-        sort_by: Optional[str] = None,
-        limit: Optional[int] = None,
-        label_selector: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        status: str | None = None,
+        has_display_name: bool | None = None,
+        older_than: str | None = None,
+        sort_by: str | None = None,
+        limit: int | None = None,
+        label_selector: str | None = None,
+    ) -> dict[str, Any]:
         """List sessions with enhanced filtering.
 
         Args:
@@ -558,9 +543,7 @@ class ACPClient:
         Returns:
             Dict with sessions list and metadata
         """
-        sessions = await self._list_resources_json(
-            "agenticsession", project, selector=label_selector
-        )
+        sessions = await self._list_resources_json("agenticsession", project, selector=label_selector)
 
         # Build filter predicates
         filters = []
@@ -576,11 +559,7 @@ class ACPClient:
 
         if older_than:
             cutoff_time = self._parse_time_delta(older_than)
-            filters.append(
-                lambda s: self._is_older_than(
-                    s.get("metadata", {}).get("creationTimestamp"), cutoff_time
-                )
-            )
+            filters.append(lambda s: self._is_older_than(s.get("metadata", {}).get("creationTimestamp"), cutoff_time))
             filters_applied["older_than"] = older_than
 
         # Single-pass filter
@@ -605,9 +584,9 @@ class ACPClient:
     async def list_sessions_by_user_labels(
         self,
         project: str,
-        labels: Dict[str, str],
+        labels: dict[str, str],
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """List sessions by user-friendly labels (convenience wrapper).
 
         Args:
@@ -624,7 +603,7 @@ class ACPClient:
 
         return await self.list_sessions(project=project, label_selector=label_selector, **kwargs)
 
-    def _sort_sessions(self, sessions: List[Dict], sort_by: str) -> List[Dict]:
+    def _sort_sessions(self, sessions: list[dict], sort_by: str) -> list[dict]:
         """Sort sessions by field.
 
         Args:
@@ -670,7 +649,7 @@ class ACPClient:
 
         raise ValueError(f"Unknown time unit: {unit}")
 
-    def _is_older_than(self, timestamp_str: Optional[str], cutoff: datetime) -> bool:
+    def _is_older_than(self, timestamp_str: str | None, cutoff: datetime) -> bool:
         """Check if timestamp is older than cutoff.
 
         Args:
@@ -687,9 +666,7 @@ class ACPClient:
         timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
         return timestamp.replace(tzinfo=None) < cutoff
 
-    async def delete_session(
-        self, project: str, session: str, dry_run: bool = False
-    ) -> Dict[str, Any]:
+    async def delete_session(self, project: str, session: str, dry_run: bool = False) -> dict[str, Any]:
         """Delete a session.
 
         Args:
@@ -716,9 +693,7 @@ class ACPClient:
             "message": f"Successfully deleted session '{session}' from project '{project}'",
         }
 
-    async def restart_session(
-        self, project: str, session: str, dry_run: bool = False
-    ) -> Dict[str, Any]:
+    async def restart_session(self, project: str, session: str, dry_run: bool = False) -> dict[str, Any]:
         """Restart a stopped session.
 
         Args:
@@ -774,9 +749,7 @@ class ACPClient:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    async def bulk_delete_sessions(
-        self, project: str, sessions: List[str], dry_run: bool = False
-    ) -> Dict[str, Any]:
+    async def bulk_delete_sessions(self, project: str, sessions: list[str], dry_run: bool = False) -> dict[str, Any]:
         """Delete multiple sessions.
 
         Args:
@@ -787,13 +760,9 @@ class ACPClient:
         Returns:
             Dict with deletion results
         """
-        return await self._bulk_operation(
-            project, sessions, self.delete_session, "deleted", dry_run
-        )
+        return await self._bulk_operation(project, sessions, self.delete_session, "deleted", dry_run)
 
-    async def bulk_stop_sessions(
-        self, project: str, sessions: List[str], dry_run: bool = False
-    ) -> Dict[str, Any]:
+    async def bulk_stop_sessions(self, project: str, sessions: list[str], dry_run: bool = False) -> dict[str, Any]:
         """Stop multiple running sessions.
 
         Args:
@@ -805,7 +774,7 @@ class ACPClient:
             Dict with stop results
         """
 
-        async def stop_session(project: str, session: str, dry_run: bool = False) -> Dict[str, Any]:
+        async def stop_session(project: str, session: str, dry_run: bool = False) -> dict[str, Any]:
             """Internal stop session helper."""
             try:
                 session_data = await self._get_resource_json("agenticsession", session, project)
@@ -849,9 +818,7 @@ class ACPClient:
 
         return await self._bulk_operation(project, sessions, stop_session, "stopped", dry_run)
 
-    async def bulk_restart_sessions(
-        self, project: str, sessions: List[str], dry_run: bool = False
-    ) -> Dict[str, Any]:
+    async def bulk_restart_sessions(self, project: str, sessions: list[str], dry_run: bool = False) -> dict[str, Any]:
         """Restart multiple stopped sessions (max 3).
 
         Args:
@@ -884,9 +851,9 @@ class ACPClient:
     async def bulk_delete_sessions_by_label(
         self,
         project: str,
-        labels: Dict[str, str],
+        labels: dict[str, str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Delete sessions matching label selector (max 3).
 
         Args:
@@ -923,9 +890,7 @@ class ACPClient:
                 "dry_run": True,
                 "matched_sessions": session_names,
                 "matched_count": len(session_names),
-                "label_selector": ",".join(
-                    [f"{self.LABEL_PREFIX}{k}={v}" for k, v in labels.items()]
-                ),
+                "label_selector": ",".join([f"{self.LABEL_PREFIX}{k}={v}" for k, v in labels.items()]),
                 "message": f"Would delete {len(session_names)} sessions. Review matched_sessions before confirming.",
             }
 
@@ -935,9 +900,9 @@ class ACPClient:
     async def bulk_stop_sessions_by_label(
         self,
         project: str,
-        labels: Dict[str, str],
+        labels: dict[str, str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Stop sessions matching label selector (max 3).
 
         Args:
@@ -974,9 +939,7 @@ class ACPClient:
                 "dry_run": True,
                 "matched_sessions": session_names,
                 "matched_count": len(session_names),
-                "label_selector": ",".join(
-                    [f"{self.LABEL_PREFIX}{k}={v}" for k, v in labels.items()]
-                ),
+                "label_selector": ",".join([f"{self.LABEL_PREFIX}{k}={v}" for k, v in labels.items()]),
                 "message": f"Would stop {len(session_names)} sessions. Review matched_sessions before confirming.",
             }
 
@@ -986,9 +949,9 @@ class ACPClient:
     async def bulk_restart_sessions_by_label(
         self,
         project: str,
-        labels: Dict[str, str],
+        labels: dict[str, str],
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Restart sessions matching label selector (max 3).
 
         Args:
@@ -1025,9 +988,7 @@ class ACPClient:
                 "dry_run": True,
                 "matched_sessions": session_names,
                 "matched_count": len(session_names),
-                "label_selector": ",".join(
-                    [f"{self.LABEL_PREFIX}{k}={v}" for k, v in labels.items()]
-                ),
+                "label_selector": ",".join([f"{self.LABEL_PREFIX}{k}={v}" for k, v in labels.items()]),
                 "message": f"Would restart {len(session_names)} sessions. Review matched_sessions before confirming.",
             }
 
@@ -1038,9 +999,9 @@ class ACPClient:
         self,
         project: str,
         session: str,
-        container: Optional[str] = None,
-        tail_lines: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        container: str | None = None,
+        tail_lines: int | None = None,
+    ) -> dict[str, Any]:
         """Get logs for a session.
 
         Args:
@@ -1065,9 +1026,7 @@ class ACPClient:
                 raise ValueError(f"tail_lines must be between 1 and {self.MAX_LOG_LINES}")
 
             # Find the pod for this session
-            pods = await self._list_resources_json(
-                "pods", project, selector=f"agenticsession={session}"
-            )
+            pods = await self._list_resources_json("pods", project, selector=f"agenticsession={session}")
 
             if not pods:
                 return {"logs": "", "error": f"No pods found for session '{session}'"}
@@ -1102,7 +1061,7 @@ class ACPClient:
         except Exception as e:
             return {"logs": "", "error": f"Unexpected error: {str(e)}"}
 
-    def list_clusters(self) -> Dict[str, Any]:
+    def list_clusters(self) -> dict[str, Any]:
         """List configured clusters.
 
         Returns:
@@ -1125,7 +1084,7 @@ class ACPClient:
 
         return {"clusters": clusters, "default_cluster": default_cluster}
 
-    async def whoami(self) -> Dict[str, Any]:
+    async def whoami(self) -> dict[str, Any]:
         """Get current user and cluster information.
 
         Returns:
@@ -1137,15 +1096,11 @@ class ACPClient:
 
         # Get current server
         server_result = await self._run_oc_command(["whoami", "--show-server"])
-        server = (
-            server_result.stdout.decode().strip() if server_result.returncode == 0 else "unknown"
-        )
+        server = server_result.stdout.decode().strip() if server_result.returncode == 0 else "unknown"
 
         # Get current project
         project_result = await self._run_oc_command(["project", "-q"])
-        project = (
-            project_result.stdout.decode().strip() if project_result.returncode == 0 else "unknown"
-        )
+        project = project_result.stdout.decode().strip() if project_result.returncode == 0 else "unknown"
 
         # Get token info
         token_result = await self._run_oc_command(["whoami", "-t"])
@@ -1193,7 +1148,7 @@ class ACPClient:
     # P2 Feature: Clone Session
     async def clone_session(
         self, project: str, source_session: str, new_display_name: str, dry_run: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Clone a session with its configuration.
 
         Args:
@@ -1243,9 +1198,7 @@ class ACPClient:
             import tempfile
 
             # Security: Use secure temp file with proper permissions (0600)
-            fd, manifest_file = tempfile.mkstemp(
-                suffix=".yaml", prefix=f"acp-clone-{secrets.token_hex(8)}-"
-            )
+            fd, manifest_file = tempfile.mkstemp(suffix=".yaml", prefix=f"acp-clone-{secrets.token_hex(8)}-")
             try:
                 # Write to file descriptor with secure permissions
                 with os.fdopen(fd, "w") as f:
@@ -1278,9 +1231,7 @@ class ACPClient:
             return {"cloned": False, "message": str(e)}
 
     # P2 Feature: Get Session Transcript
-    async def get_session_transcript(
-        self, project: str, session: str, format: str = "json"
-    ) -> Dict[str, Any]:
+    async def get_session_transcript(self, project: str, session: str, format: str = "json") -> dict[str, Any]:
         """Get session transcript/conversation history.
 
         Args:
@@ -1337,10 +1288,10 @@ class ACPClient:
         self,
         project: str,
         session: str,
-        display_name: Optional[str] = None,
-        timeout: Optional[int] = None,
+        display_name: str | None = None,
+        timeout: int | None = None,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Update session metadata.
 
         Args:
@@ -1417,7 +1368,7 @@ class ACPClient:
             return {"updated": False, "message": str(e)}
 
     # P2 Feature: Export Session
-    async def export_session(self, project: str, session: str) -> Dict[str, Any]:
+    async def export_session(self, project: str, session: str) -> dict[str, Any]:
         """Export session configuration and transcript.
 
         Args:
@@ -1460,7 +1411,7 @@ class ACPClient:
             return {"exported": False, "error": str(e)}
 
     # P3 Feature: Get Session Metrics
-    async def get_session_metrics(self, project: str, session: str) -> Dict[str, Any]:
+    async def get_session_metrics(self, project: str, session: str) -> dict[str, Any]:
         """Get session metrics and statistics.
 
         Args:
@@ -1520,7 +1471,7 @@ class ACPClient:
             return {"error": str(e)}
 
     # P3 Feature: List Workflows
-    async def list_workflows(self, repo_url: Optional[str] = None) -> Dict[str, Any]:
+    async def list_workflows(self, repo_url: str | None = None) -> dict[str, Any]:
         """List available workflows from repository.
 
         Args:
@@ -1563,7 +1514,8 @@ class ACPClient:
                     stderr=asyncio.subprocess.PIPE,
                 )
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=60  # 60 second timeout for git clone
+                    process.communicate(),
+                    timeout=60,  # 60 second timeout for git clone
                 )
 
                 if process.returncode != 0:
@@ -1593,7 +1545,7 @@ class ACPClient:
 
                         # Read workflow to get metadata
                         try:
-                            with open(workflow_file, "r") as f:
+                            with open(workflow_file) as f:
                                 workflow_data = yaml.safe_load(f)
                                 if not isinstance(workflow_data, dict):
                                     workflow_data = {}
@@ -1626,7 +1578,7 @@ class ACPClient:
                 except Exception:
                     pass
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"workflows": [], "error": "Repository clone timed out"}
         except Exception as e:
             return {"workflows": [], "error": f"Unexpected error: {str(e)}"}
@@ -1637,9 +1589,9 @@ class ACPClient:
         project: str,
         template: str,
         display_name: str,
-        repos: Optional[List[str]] = None,
+        repos: list[str] | None = None,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create session from predefined template.
 
         Args:
@@ -1716,9 +1668,7 @@ class ACPClient:
             import tempfile
 
             # Security: Use secure temp file with proper permissions (0600)
-            fd, manifest_file = tempfile.mkstemp(
-                suffix=".yaml", prefix=f"acp-template-{secrets.token_hex(8)}-"
-            )
+            fd, manifest_file = tempfile.mkstemp(suffix=".yaml", prefix=f"acp-template-{secrets.token_hex(8)}-")
             try:
                 # Write to file descriptor with secure permissions
                 with os.fdopen(fd, "w") as f:
@@ -1751,9 +1701,7 @@ class ACPClient:
             return {"created": False, "message": str(e)}
 
     # Auth Feature: Login
-    async def login(
-        self, cluster: str, web: bool = True, token: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def login(self, cluster: str, web: bool = True, token: str | None = None) -> dict[str, Any]:
         """Authenticate to OpenShift cluster.
 
         Args:
@@ -1809,7 +1757,7 @@ class ACPClient:
             return {"authenticated": False, "message": str(e)}
 
     # Auth Feature: Switch Cluster
-    async def switch_cluster(self, cluster: str) -> Dict[str, Any]:
+    async def switch_cluster(self, cluster: str) -> dict[str, Any]:
         """Switch to a different cluster context.
 
         Args:
@@ -1863,10 +1811,10 @@ class ACPClient:
         self,
         name: str,
         server: str,
-        description: Optional[str] = None,
-        default_project: Optional[str] = None,
+        description: str | None = None,
+        default_project: str | None = None,
         set_default: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a new cluster to configuration.
 
         Args:
@@ -1883,9 +1831,7 @@ class ACPClient:
             # Security: Validate inputs
             if not isinstance(name, str) or not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", name):
                 return {"added": False, "message": "Invalid cluster name format"}
-            if not isinstance(server, str) or not (
-                server.startswith("https://") or server.startswith("http://")
-            ):
+            if not isinstance(server, str) or not (server.startswith("https://") or server.startswith("http://")):
                 return {"added": False, "message": "Server must be a valid HTTP/HTTPS URL"}
             if description and (not isinstance(description, str) or len(description) > 500):
                 return {

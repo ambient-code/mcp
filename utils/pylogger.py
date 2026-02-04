@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any, Dict, List, Set
+from typing import Any
 
 import structlog
 
@@ -63,15 +63,9 @@ OBSERVABILITY_LOGGERS = {
 
 # --- Aggregated Sets ---
 
-THIRD_PARTY_LOGGERS: Set[str] = (
-    HTTP_CLIENT_LOGGERS
-    | AWS_LOGGERS
-    | MCP_LOGGERS
-    | ML_AI_LOGGERS
-    | OBSERVABILITY_LOGGERS
-)
+THIRD_PARTY_LOGGERS: set[str] = HTTP_CLIENT_LOGGERS | AWS_LOGGERS | MCP_LOGGERS | ML_AI_LOGGERS | OBSERVABILITY_LOGGERS
 
-ERROR_ONLY_LOGGERS: Set[str] = ML_AI_LOGGERS | OBSERVABILITY_LOGGERS
+ERROR_ONLY_LOGGERS: set[str] = ML_AI_LOGGERS | OBSERVABILITY_LOGGERS
 
 _LOGGING_CONFIGURED = False
 
@@ -145,7 +139,7 @@ def get_python_logger(log_level: str = "INFO") -> structlog.BoundLogger:
     return structlog.get_logger()
 
 
-def get_uvicorn_log_config(log_level: str = "INFO") -> Dict[str, Any]:
+def get_uvicorn_log_config(log_level: str = "INFO") -> dict[str, Any]:
     """Return a Uvicorn-compatible logging config that integrates with structlog."""
     log_level = log_level.upper()
     default_formatter = {
@@ -160,7 +154,7 @@ def get_uvicorn_log_config(log_level: str = "INFO") -> Dict[str, Any]:
         ],
     }
 
-    def make_logger_config(names: List[str], level: str) -> Dict[str, Any]:
+    def make_logger_config(names: list[str], level: str) -> dict[str, Any]:
         return {
             name: {
                 "handlers": ["default"],
@@ -196,9 +190,7 @@ def get_uvicorn_log_config(log_level: str = "INFO") -> Dict[str, Any]:
         "loggers": {
             **make_logger_config(base_loggers, log_level),
             **make_logger_config(access_loggers, log_level),
-            **make_logger_config(
-                list(THIRD_PARTY_LOGGERS - ERROR_ONLY_LOGGERS), log_level
-            ),
+            **make_logger_config(list(THIRD_PARTY_LOGGERS - ERROR_ONLY_LOGGERS), log_level),
             **make_logger_config(list(ERROR_ONLY_LOGGERS), "ERROR"),
         },
     }

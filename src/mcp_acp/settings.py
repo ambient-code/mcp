@@ -4,7 +4,6 @@ Uses Pydantic BaseSettings for type-safe configuration with validation.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
 
 import yaml
 from pydantic import Field, field_validator
@@ -34,7 +33,7 @@ class ClusterConfig(BaseSettings):
         description="Default project/namespace for operations",
         json_schema_extra={"example": "my-workspace"},
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Human-readable cluster description",
         json_schema_extra={"example": "Production cluster"},
@@ -57,9 +56,7 @@ class ClusterConfig(BaseSettings):
         if len(v) > 63:
             raise ValueError("default_project must be 63 characters or less")
         if not v.replace("-", "").replace("_", "").isalnum():
-            raise ValueError(
-                "default_project must contain only alphanumeric characters, hyphens, or underscores"
-            )
+            raise ValueError("default_project must contain only alphanumeric characters, hyphens, or underscores")
         return v
 
 
@@ -71,25 +68,23 @@ class ClustersConfig(BaseSettings):
         default_cluster: Name of the default cluster to use
     """
 
-    clusters: Dict[str, ClusterConfig] = Field(
+    clusters: dict[str, ClusterConfig] = Field(
         default_factory=dict,
         description="Map of cluster names to configurations",
     )
-    default_cluster: Optional[str] = Field(
+    default_cluster: str | None = Field(
         default=None,
         description="Name of the default cluster",
     )
 
     @field_validator("default_cluster")
     @classmethod
-    def validate_default_cluster(cls, v: Optional[str], info) -> Optional[str]:
+    def validate_default_cluster(cls, v: str | None, info) -> str | None:
         """Ensure default_cluster exists in clusters."""
         if v is not None:
             clusters = info.data.get("clusters", {})
             if v not in clusters:
-                raise ValueError(
-                    f"default_cluster '{v}' not found in clusters: {list(clusters.keys())}"
-                )
+                raise ValueError(f"default_cluster '{v}' not found in clusters: {list(clusters.keys())}")
         return v
 
     @classmethod
@@ -208,7 +203,7 @@ def load_settings() -> Settings:
     return Settings()
 
 
-def load_clusters_config(settings: Optional[Settings] = None) -> ClustersConfig:
+def load_clusters_config(settings: Settings | None = None) -> ClustersConfig:
     """Load and validate cluster configuration.
 
     Args:
