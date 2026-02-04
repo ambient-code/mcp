@@ -743,6 +743,17 @@ def create_dispatch_table(client: ACPClient) -> dict[str, tuple[Callable, Callab
     }
 
 
+# Tools that don't require a project parameter (cluster-level or config operations)
+TOOLS_WITHOUT_PROJECT = {
+    "acp_list_clusters",
+    "acp_whoami",
+    "acp_login",
+    "acp_switch_cluster",
+    "acp_add_cluster",
+    "acp_list_workflows",
+}
+
+
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls with dispatch table.
@@ -773,7 +784,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
         # Auto-fill project from default_project if not provided or empty
-        if not arguments.get("project"):
+        # Only for tools that actually use project parameter
+        if name not in TOOLS_WITHOUT_PROJECT and not arguments.get("project"):
             # Get default project from current cluster config
             default_cluster = client.config.get("default_cluster")
             if default_cluster:
