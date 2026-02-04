@@ -8,9 +8,9 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    environment: testpypi  # Use dedicated Test PyPI environment
+    environment: pypi  # Use production PyPI environment
     permissions:
-      id-token: write  # Required for trusted publishing to Test PyPI
+      id-token: write  # Required for trusted publishing to PyPI
       contents: read
 
     steps:
@@ -41,8 +41,7 @@ jobs:
           name: release-packages
           path: dist/
 
-      - name: Publish to Test PyPI
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://test.pypi.org/legacy/
           skip-existing: true
