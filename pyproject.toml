@@ -114,7 +114,7 @@ addopts = [
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 commit_message = "chore(release): {version}"
-build_command = "uvx --from build pyproject-build --installer uv"
+build_command = "pip install build && python -m build"
 
 [tool.semantic_release.remote]
 type = "github"
