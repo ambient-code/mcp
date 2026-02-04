@@ -64,6 +64,3 @@ clusters.yaml
 artifacts/
 # Development artifacts
 uv.lock
-CLEANUP-QUICKSTART.md
-README-CLEANUP.md
-cleanup-namespaces.sh
