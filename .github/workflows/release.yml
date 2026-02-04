@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    environment: pypi  # Required for trusted publishing
     permissions:
       id-token: write  # Required for trusted publishing to PyPI
       contents: read
