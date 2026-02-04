@@ -1,21 +1,29 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  build-and-publish:
+  release:
     runs-on: ubuntu-latest
-    environment: pypi  # Use production PyPI environment
+    concurrency: release
     permissions:
-      id-token: write  # Required for trusted publishing to PyPI
-      contents: read
+      id-token: write
+      contents: write
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mcp-acp/
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,19 +36,24 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
 
-      - name: Build wheel and sdist
+      - name: Python Semantic Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v9.15.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build package
+        if: steps.release.outputs.released == 'true'
         run: uvx --from build pyproject-build --installer uv
 
-      - name: Prune uv cache for CI
-        run: uv cache prune --ci
-
-      - name: Upload release artifacts to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-packages
-          path: dist/
-
       - name: Publish to PyPI
+        if: steps.release.outputs.released == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+      - name: Upload artifacts to GitHub Release
+        if: steps.release.outputs.released == 'true'
+        uses: python-semantic-release/publish-action@v9.15.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
