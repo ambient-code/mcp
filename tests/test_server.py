@@ -4,21 +4,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_acp.formatters import (
-    format_bulk_result,
-    format_clusters,
-    format_logs,
-    format_result,
-    format_sessions_list,
-    format_whoami,
+from mcp_acp.server import (
+    _format_bulk_result,
+    _format_clusters,
+    _format_logs,
+    _format_result,
+    _format_sessions_list,
+    _format_whoami,
+    call_tool,
+    list_tools,
 )
-from mcp_acp.server import call_tool, list_tools
 
 
 class TestServerFormatters:
     """Tests for server formatting functions."""
 
-    def testformat_result_dry_run(self) -> None:
+    def test_format_result_dry_run(self) -> None:
         """Test formatting dry run results."""
         result = {
             "dry_run": True,
@@ -26,21 +27,21 @@ class TestServerFormatters:
             "session_info": {"name": "test-session", "status": "running"},
         }
 
-        output = format_result(result)
+        output = _format_result(result)
 
         assert "DRY RUN MODE" in output
         assert "Would delete session" in output
         assert "test-session" in output
 
-    def testformat_result_normal(self) -> None:
+    def test_format_result_normal(self) -> None:
         """Test formatting normal results."""
         result = {"deleted": True, "message": "Successfully deleted session"}
 
-        output = format_result(result)
+        output = _format_result(result)
 
         assert "Successfully deleted session" in output
 
-    def testformat_sessions_list(self) -> None:
+    def test_format_sessions_list(self) -> None:
         """Test formatting sessions list."""
         result = {
             "total": 2,
@@ -65,7 +66,7 @@ class TestServerFormatters:
             ],
         }
 
-        output = format_sessions_list(result)
+        output = _format_sessions_list(result)
 
         assert "Found 2 session(s)" in output
         assert "session-1" in output
@@ -73,7 +74,7 @@ class TestServerFormatters:
         assert "session-2" in output
         assert "running" in output
 
-    def testformat_bulk_result_delete_dry_run(self) -> None:
+    def test_format_bulk_result_delete_dry_run(self) -> None:
         """Test formatting bulk delete dry run."""
         result = {
             "dry_run": True,
@@ -86,7 +87,7 @@ class TestServerFormatters:
             },
         }
 
-        output = format_bulk_result(result, "delete")
+        output = _format_bulk_result(result, "delete")
 
         assert "DRY RUN MODE" in output
         assert "Would delete 2 session(s)" in output
@@ -95,14 +96,14 @@ class TestServerFormatters:
         assert "Not found" in output
         assert "session-3" in output
 
-    def testformat_bulk_result_delete_normal(self) -> None:
+    def test_format_bulk_result_delete_normal(self) -> None:
         """Test formatting bulk delete normal mode."""
         result = {
             "deleted": ["session-1", "session-2"],
             "failed": [{"session": "session-3", "error": "Not found"}],
         }
 
-        output = format_bulk_result(result, "delete")
+        output = _format_bulk_result(result, "delete")
 
         assert "Successfully deleted 2 session(s)" in output
         assert "session-1" in output
@@ -111,7 +112,7 @@ class TestServerFormatters:
         assert "session-3" in output
         assert "Not found" in output
 
-    def testformat_bulk_result_stop_dry_run(self) -> None:
+    def test_format_bulk_result_stop_dry_run(self) -> None:
         """Test formatting bulk stop dry run."""
         result = {
             "dry_run": True,
@@ -125,7 +126,7 @@ class TestServerFormatters:
             },
         }
 
-        output = format_bulk_result(result, "stop")
+        output = _format_bulk_result(result, "stop")
 
         assert "DRY RUN MODE" in output
         assert "Would stop 1 session(s)" in output
@@ -133,7 +134,7 @@ class TestServerFormatters:
         assert "Not running" in output
         assert "session-2" in output
 
-    def testformat_logs(self) -> None:
+    def test_format_logs(self) -> None:
         """Test formatting logs."""
         result = {
             "logs": "2024-01-20 10:00:00 INFO Starting\n2024-01-20 10:00:01 INFO Ready\n",
@@ -141,22 +142,22 @@ class TestServerFormatters:
             "lines": 3,
         }
 
-        output = format_logs(result)
+        output = _format_logs(result)
 
         assert "container 'runner'" in output
         assert "3 lines" in output
         assert "Starting" in output
         assert "Ready" in output
 
-    def testformat_logs_error(self) -> None:
+    def test_format_logs_error(self) -> None:
         """Test formatting logs with error."""
         result = {"error": "Pod not found"}
 
-        output = format_logs(result)
+        output = _format_logs(result)
 
         assert "Error: Pod not found" in output
 
-    def testformat_clusters(self) -> None:
+    def test_format_clusters(self) -> None:
         """Test formatting clusters list."""
         result = {
             "clusters": [
@@ -178,7 +179,7 @@ class TestServerFormatters:
             "default_cluster": "test-cluster",
         }
 
-        output = format_clusters(result)
+        output = _format_clusters(result)
 
         assert "test-cluster [DEFAULT]" in output
         assert "prod-cluster" in output
@@ -186,15 +187,15 @@ class TestServerFormatters:
         assert "Production Cluster" in output
         assert "https://api.test.example.com:443" in output
 
-    def testformat_clusters_empty(self) -> None:
+    def test_format_clusters_empty(self) -> None:
         """Test formatting empty clusters list."""
         result = {"clusters": [], "default_cluster": None}
 
-        output = format_clusters(result)
+        output = _format_clusters(result)
 
         assert "No clusters configured" in output
 
-    def testformat_whoami_authenticated(self) -> None:
+    def test_format_whoami_authenticated(self) -> None:
         """Test formatting whoami when authenticated."""
         result = {
             "authenticated": True,
@@ -204,7 +205,7 @@ class TestServerFormatters:
             "token_valid": True,
         }
 
-        output = format_whoami(result)
+        output = _format_whoami(result)
 
         assert "Authenticated: Yes" in output
         assert "User: testuser" in output
@@ -212,7 +213,7 @@ class TestServerFormatters:
         assert "Project: test-workspace" in output
         assert "Token Valid: Yes" in output
 
-    def testformat_whoami_not_authenticated(self) -> None:
+    def test_format_whoami_not_authenticated(self) -> None:
         """Test formatting whoami when not authenticated."""
         result = {
             "authenticated": False,
@@ -222,7 +223,7 @@ class TestServerFormatters:
             "token_valid": False,
         }
 
-        output = format_whoami(result)
+        output = _format_whoami(result)
 
         assert "Authenticated: No" in output
         assert "not authenticated" in output
