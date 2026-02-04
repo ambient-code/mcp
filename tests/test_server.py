@@ -4,16 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_acp.server import (
-    _format_bulk_result,
-    _format_clusters,
-    _format_logs,
-    _format_result,
-    _format_sessions_list,
-    _format_whoami,
-    call_tool,
-    list_tools,
+from mcp_acp.formatters import (
+    format_bulk_result,
+    format_clusters,
+    format_logs,
+    format_result,
+    format_sessions_list,
+    format_whoami,
 )
+from mcp_acp.server import call_tool, list_tools
 
 
 class TestServerFormatters:
@@ -27,7 +26,7 @@ class TestServerFormatters:
             "session_info": {"name": "test-session", "status": "running"},
         }
 
-        output = _format_result(result)
+        output = format_result(result)
 
         assert "DRY RUN MODE" in output
         assert "Would delete session" in output
@@ -37,7 +36,7 @@ class TestServerFormatters:
         """Test formatting normal results."""
         result = {"deleted": True, "message": "Successfully deleted session"}
 
-        output = _format_result(result)
+        output = format_result(result)
 
         assert "Successfully deleted session" in output
 
@@ -66,7 +65,7 @@ class TestServerFormatters:
             ],
         }
 
-        output = _format_sessions_list(result)
+        output = format_sessions_list(result)
 
         assert "Found 2 session(s)" in output
         assert "session-1" in output
@@ -87,7 +86,7 @@ class TestServerFormatters:
             },
         }
 
-        output = _format_bulk_result(result, "delete")
+        output = format_bulk_result(result, "delete")
 
         assert "DRY RUN MODE" in output
         assert "Would delete 2 session(s)" in output
@@ -103,7 +102,7 @@ class TestServerFormatters:
             "failed": [{"session": "session-3", "error": "Not found"}],
         }
 
-        output = _format_bulk_result(result, "delete")
+        output = format_bulk_result(result, "delete")
 
         assert "Successfully deleted 2 session(s)" in output
         assert "session-1" in output
@@ -126,7 +125,7 @@ class TestServerFormatters:
             },
         }
 
-        output = _format_bulk_result(result, "stop")
+        output = format_bulk_result(result, "stop")
 
         assert "DRY RUN MODE" in output
         assert "Would stop 1 session(s)" in output
@@ -142,7 +141,7 @@ class TestServerFormatters:
             "lines": 3,
         }
 
-        output = _format_logs(result)
+        output = format_logs(result)
 
         assert "container 'runner'" in output
         assert "3 lines" in output
@@ -153,7 +152,7 @@ class TestServerFormatters:
         """Test formatting logs with error."""
         result = {"error": "Pod not found"}
 
-        output = _format_logs(result)
+        output = format_logs(result)
 
         assert "Error: Pod not found" in output
 
@@ -179,7 +178,7 @@ class TestServerFormatters:
             "default_cluster": "test-cluster",
         }
 
-        output = _format_clusters(result)
+        output = format_clusters(result)
 
         assert "test-cluster [DEFAULT]" in output
         assert "prod-cluster" in output
@@ -191,7 +190,7 @@ class TestServerFormatters:
         """Test formatting empty clusters list."""
         result = {"clusters": [], "default_cluster": None}
 
-        output = _format_clusters(result)
+        output = format_clusters(result)
 
         assert "No clusters configured" in output
 
@@ -205,7 +204,7 @@ class TestServerFormatters:
             "token_valid": True,
         }
 
-        output = _format_whoami(result)
+        output = format_whoami(result)
 
         assert "Authenticated: Yes" in output
         assert "User: testuser" in output
@@ -223,7 +222,7 @@ class TestServerFormatters:
             "token_valid": False,
         }
 
-        output = _format_whoami(result)
+        output = format_whoami(result)
 
         assert "Authenticated: No" in output
         assert "not authenticated" in output
