@@ -44,6 +44,11 @@ jobs:
       - name: Prune uv cache for CI
         run: uv cache prune --ci
 
+      - name: Set up test cluster config
+        run: |
+          mkdir -p ~/.config/acp
+          cp clusters.yaml.example ~/.config/acp/clusters.yaml
+
       - name: Run ruff (lint and format check)
         run: |
           uv run ruff check .
