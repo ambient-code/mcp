@@ -1184,7 +1184,7 @@ class ACPClient:
 
             # Create session manifest
             manifest = {
-                "apiVersion": "agenticplatform.io/v1",
+                "apiVersion": "vteam.ambient-code/v1alpha1",
                 "kind": "AgenticSession",
                 "metadata": {
                     "generateName": f"{source_session}-clone-",
@@ -1649,7 +1649,7 @@ class ACPClient:
         try:
             # Create session manifest
             manifest = {
-                "apiVersion": "agenticplatform.io/v1",
+                "apiVersion": "vteam.ambient-code/v1alpha1",
                 "kind": "AgenticSession",
                 "metadata": {
                     "generateName": f"{template}-",
