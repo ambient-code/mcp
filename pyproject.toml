@@ -1,6 +1,6 @@
 [project]
 name = "mcp-acp"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server for Ambient Code Platform (ACP) session management on OpenShift - list, delete, debug, and manage AgenticSession resources"
 readme = "README.md"
 requires-python = ">=3.12"

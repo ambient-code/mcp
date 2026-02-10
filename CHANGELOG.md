@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.1.1 (2026-02-10)
+
+### Bug Fixes
+
+- Clean stale egg-info before build in release workflow
+  ([`7e96f2a`](https://github.com/ambient-code/mcp/commit/7e96f2a39576687dbe56ce7354500a1d3a822db3))
+
+semantic-release runs setuptools internally via build_command, which creates a src/mcp_acp.egg-info
+  directory. This stale directory causes the subsequent pyproject-build step to fail with: "error:
+  Cannot update time stamp of directory 'src/mcp_acp.egg-info'"
+
+Add rm -rf src/*.egg-info before the build step to prevent the collision.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.0 (2026-02-10)
 
 ### Bug Fixes
@@ -171,6 +187,11 @@ Next step: Configure Test PyPI trusted publisher at https://test.pypi.org/manage
   with: - Owner: ambient-code - Repository: mcp - Workflow: release.yml - Environment: testpypi
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.1.0
+  ([`2cffc10`](https://github.com/ambient-code/mcp/commit/2cffc10c7670caab9839f416b741268fef66a1dc))
 
 ### Documentation
 
