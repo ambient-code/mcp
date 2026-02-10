@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.1.3 (2026-02-10)
+
+### Bug Fixes
+
+- Also clean root-owned dist/ and build/ dirs in release workflow
+  ([`b866b32`](https://github.com/ambient-code/mcp/commit/b866b32738870a6c4e67b732168e35d3750cdd14))
+
+The python-semantic-release Docker action creates dist/ and build/ directories in addition to
+  egg-info, all owned by root. The previous fix only cleaned egg-info, so the build step still
+  failed trying to write to the root-owned dist/ directory.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.2 (2026-02-10)
 
 ### Bug Fixes
@@ -13,6 +27,11 @@ The python-semantic-release Docker action runs as root, creating src/mcp_acp.egg
   runner user. Using sudo resolves this.
 
 Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.1.2
+  ([`836d6d7`](https://github.com/ambient-code/mcp/commit/836d6d7b269e8b5054e64201d2f0fccc94a47d2d))
 
 
 ## v0.1.1 (2026-02-10)
