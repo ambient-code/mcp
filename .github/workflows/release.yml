@@ -44,7 +44,7 @@ jobs:
 
       - name: Clean stale build artifacts
         if: steps.release.outputs.released == 'true'
-        run: sudo rm -rf src/*.egg-info
+        run: sudo rm -rf src/*.egg-info dist/ build/
 
       - name: Build package
         if: steps.release.outputs.released == 'true'
