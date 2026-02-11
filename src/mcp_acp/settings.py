@@ -15,18 +15,23 @@ logger = get_python_logger()
 
 
 class ClusterConfig(BaseSettings):
-    """Configuration for a single OpenShift cluster.
+    """Configuration for a single Ambient Code Platform cluster.
 
     Attributes:
-        server: OpenShift API server URL
+        server: Public API gateway URL (the frontend route that exposes the public-api service)
         default_project: Default project/namespace to use
         description: Optional human-readable description
+        token: Optional authentication token (can also be set via environment variable)
     """
 
     server: str = Field(
         ...,
-        description="OpenShift API server URL",
-        json_schema_extra={"example": "https://api.cluster.example.com:6443"},
+        description="Public API gateway URL",
+        json_schema_extra={"example": "https://public-api-ambient.apps.cluster.example.com"},
+    )
+    token: str | None = Field(
+        default=None,
+        description="Authentication token (Bearer token for API access)",
     )
     default_project: str = Field(
         ...,
@@ -45,7 +50,8 @@ class ClusterConfig(BaseSettings):
         """Validate server URL format."""
         if not v.startswith(("https://", "http://")):
             raise ValueError("Server URL must start with https:// or http://")
-        return v
+        # Strip trailing slash for consistency
+        return v.rstrip("/")
 
     @field_validator("default_project")
     @classmethod
@@ -61,7 +67,7 @@ class ClusterConfig(BaseSettings):
 
 
 class ClustersConfig(BaseSettings):
-    """Configuration for all OpenShift clusters.
+    """Configuration for all Ambient Code Platform clusters.
 
     Attributes:
         clusters: Dictionary of cluster configurations
@@ -144,9 +150,6 @@ class Settings(BaseSettings):
     Attributes:
         config_path: Path to clusters.yaml configuration file
         log_level: Logging level
-        timeout_default: Default timeout for oc commands (seconds)
-        max_log_lines: Maximum log lines to retrieve
-        max_file_size: Maximum file size for exports (bytes)
     """
 
     config_path: Path = Field(
@@ -157,24 +160,6 @@ class Settings(BaseSettings):
         default="INFO",
         description="Logging level",
         json_schema_extra={"enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]},
-    )
-    timeout_default: int = Field(
-        default=300,
-        ge=1,
-        le=3600,
-        description="Default timeout for oc commands (seconds)",
-    )
-    max_log_lines: int = Field(
-        default=10000,
-        ge=1,
-        le=100000,
-        description="Maximum log lines to retrieve",
-    )
-    max_file_size: int = Field(
-        default=10 * 1024 * 1024,  # 10MB
-        ge=1024,
-        le=100 * 1024 * 1024,  # 100MB
-        description="Maximum file size for exports (bytes)",
     )
 
     @field_validator("log_level")
