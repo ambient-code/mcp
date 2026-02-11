@@ -35,7 +35,7 @@ jobs:
             venv-${{ runner.os }}-
 
       - name: Create virtual environment
-        run: uv venv
+        run: uv venv --allow-existing
 
       - name: Install dependencies
         run: uv pip install -e ".[dev]"
