@@ -1,7 +1,7 @@
 [project]
 name = "mcp-acp"
 version = "0.1.3"
-description = "MCP server for Ambient Code Platform (ACP) session management on OpenShift - list, delete, debug, and manage AgenticSession resources"
+description = "MCP server for Ambient Code Platform (ACP) session management - list, delete, debug, and manage AgenticSession resources via the public API"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
@@ -12,11 +12,9 @@ keywords = [
     "acp",
     "ambient",
     "ambient-code-platform",
-    "ambient-container-platform",
-    "openshift",
-    "kubernetes",
     "agentic-session",
-    "agenticsession"
+    "agenticsession",
+    "public-api"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -32,7 +30,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "structlog>=25.0.0",
     "python-dotenv>=1.0.0",
-    "aiohttp>=3.8.0",
+    "httpx>=0.27.0",
     "pyyaml>=6.0",
     "python-dateutil>=2.8.0",
 ]
