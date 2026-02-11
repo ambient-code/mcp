@@ -48,10 +48,11 @@ jobs:
           mkdir -p ~/.config/acp
           cp clusters.yaml.example ~/.config/acp/clusters.yaml
 
-      - name: Run ruff (lint and format check)
+      - name: Run ruff (autofix, then verify)
         run: |
-          uv run ruff check .
-          uv run ruff format --check .
+          uv run ruff check --fix .
+          uv run ruff format .
+          git diff --exit-code || (echo "ruff made changes — commit them locally before pushing" && exit 1)
 
       # TODO: Enable mypy once type annotations are complete
       # - name: Run mypy (type checking)
