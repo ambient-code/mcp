@@ -79,8 +79,7 @@ class ACPClient:
 
         if not token:
             raise ValueError(
-                "No authentication token available. "
-                "Set 'token' in clusters.yaml or ACP_TOKEN environment variable."
+                "No authentication token available. Set 'token' in clusters.yaml or ACP_TOKEN environment variable."
             )
 
         return token
@@ -162,9 +161,7 @@ class ACPClient:
         if len(value) > max_length:
             raise ValueError(f"{field_name} exceeds maximum length of {max_length}")
         if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", value):
-            raise ValueError(
-                f"{field_name} contains invalid characters. Must match DNS-1123 format."
-            )
+            raise ValueError(f"{field_name} contains invalid characters. Must match DNS-1123 format.")
 
     def _validate_bulk_operation(self, items: list[str], operation_name: str) -> None:
         """Enforce item limit for bulk operations."""
@@ -197,7 +194,7 @@ class ACPClient:
         sessions = response.get("items", [])
 
         filters = []
-        filters_applied = {}
+        filters_applied: dict[str, str | int] = {}
 
         if status:
             filters.append(lambda s: s.get("status", "").lower() == status.lower())
@@ -311,9 +308,7 @@ class ACPClient:
                 "message": f"Failed to delete session: {str(e)}",
             }
 
-    async def bulk_delete_sessions(
-        self, project: str, sessions: list[str], dry_run: bool = False
-    ) -> dict[str, Any]:
+    async def bulk_delete_sessions(self, project: str, sessions: list[str], dry_run: bool = False) -> dict[str, Any]:
         """Delete multiple sessions (max 3).
 
         Args:
@@ -325,22 +320,26 @@ class ACPClient:
 
         success = []
         failed = []
-        dry_run_info = {"would_execute": [], "skipped": []}
+        dry_run_info: dict[str, list[dict[str, Any]]] = {"would_execute": [], "skipped": []}
 
         for session in sessions:
             result = await self.delete_session(project, session, dry_run=dry_run)
 
             if dry_run:
                 if result.get("success", True):
-                    dry_run_info["would_execute"].append({
-                        "session": session,
-                        "info": result.get("session_info"),
-                    })
+                    dry_run_info["would_execute"].append(
+                        {
+                            "session": session,
+                            "info": result.get("session_info"),
+                        }
+                    )
                 else:
-                    dry_run_info["skipped"].append({
-                        "session": session,
-                        "reason": result.get("message"),
-                    })
+                    dry_run_info["skipped"].append(
+                        {
+                            "session": session,
+                            "reason": result.get("message"),
+                        }
+                    )
             else:
                 if result.get("deleted"):
                     success.append(session)
@@ -360,13 +359,15 @@ class ACPClient:
         default_cluster = self.clusters_config.default_cluster
 
         for name, cluster in self.clusters_config.clusters.items():
-            clusters.append({
-                "name": name,
-                "server": cluster.server,
-                "description": cluster.description or "",
-                "default_project": cluster.default_project,
-                "is_default": name == default_cluster,
-            })
+            clusters.append(
+                {
+                    "name": name,
+                    "server": cluster.server,
+                    "description": cluster.description or "",
+                    "default_project": cluster.default_project,
+                    "is_default": name == default_cluster,
+                }
+            )
 
         return {"clusters": clusters, "default_cluster": default_cluster}
 
