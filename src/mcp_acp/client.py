@@ -79,7 +79,7 @@ class ACPClient:
 
         if not token:
             raise ValueError(
-                "No authentication token available. " "Set 'token' in clusters.yaml or ACP_TOKEN environment variable."
+                "No authentication token available. Set 'token' in clusters.yaml or ACP_TOKEN environment variable."
             )
 
         return token
