@@ -84,7 +84,7 @@ uv run python -m mcp_acp.server
 ### Three-Layer Design
 
 **1. MCP Server Layer (`server.py`)**
-- Exposes 8 MCP tools via stdio protocol
+- Exposes 26 MCP tools via stdio protocol
 - Inline JSON Schema definitions per tool
 - if/elif dispatch in `call_tool()` maps tool names to handlers
 - Server-layer confirmation enforcement for destructive bulk operations
@@ -98,7 +98,7 @@ uv run python -m mcp_acp.server
 **3. Formatting Layer (`formatters.py`)**
 - Converts raw API responses to user-friendly text
 - Handles dry-run output, error states, bulk results
-- Format functions: `format_result()`, `format_bulk_result()`, `format_sessions_list()`, etc.
+- Format functions: `format_result()`, `format_bulk_result()`, `format_sessions_list()`, `format_session_created()`, `format_logs()`, `format_transcript()`, `format_metrics()`, `format_labels()`, `format_login()`, etc.
 
 ### Data Flow
 
@@ -382,6 +382,15 @@ From `client.py`:
 ```python
 MAX_BULK_ITEMS = 3
 DEFAULT_TIMEOUT = 30.0  # seconds (httpx request timeout)
+
+LABEL_VALUE_PATTERN = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+
+SESSION_TEMPLATES = {
+    "triage": {"workflow": "triage", "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.7}},
+    "bugfix": {"workflow": "bugfix", "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.3}},
+    "feature": {"workflow": "feature-development", "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.5}},
+    "exploration": {"workflow": "codebase-exploration", "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.8}},
+}
 ```
 
 ---
@@ -412,10 +421,8 @@ DEFAULT_TIMEOUT = 30.0  # seconds (httpx request timeout)
 ## Documentation
 
 - **[README.md](README.md)** - Project overview, quick start, and usage guide
-- **[API_REFERENCE.md](API_REFERENCE.md)** - Complete tool specifications (8 tools)
+- **[API_REFERENCE.md](API_REFERENCE.md)** - Complete tool specifications (26 tools)
 - **[SECURITY.md](SECURITY.md)** - Security features and threat model
-
-See [issue #27](https://github.com/ambient-code/mcp/issues/27) for 21 planned additional tools.
 
 ---
 
@@ -437,9 +444,17 @@ See [issue #27](https://github.com/ambient-code/mcp/issues/27) for 21 planned ad
 
 ### When Adding New Tools
 
-- See [issue #27](https://github.com/ambient-code/mcp/issues/27) for the backlog of planned tools
+- See issues [#28](https://github.com/ambient-code/mcp/issues/28) and [#29](https://github.com/ambient-code/mcp/issues/29) for the remaining planned tools
 - Follow the 4-step pattern: client method -> tool definition -> dispatch branch -> tests
-- All API calls go through `_request()` method
+- All API calls go through `_request()` or `_request_text()` methods
+
+### When Working with Label Operations
+
+- Labels are validated via `_validate_labels()` using `LABEL_VALUE_PATTERN`
+- Label keys and values: 1-63 chars, alphanumeric, dashes, dots, underscores
+- Label selectors are built as `key1=value1,key2=value2` query strings
+- Bulk label/unlabel operations use `_validate_bulk_operation()` for the 3-item limit
+- "By label" bulk operations first resolve labels to session names via `_run_bulk_by_label()`
 
 ### Code Quality Standards
 

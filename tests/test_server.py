@@ -16,23 +16,48 @@ class TestListTools:
         tools = await list_tools()
         tool_names = [t.name for t in tools]
 
-        # Session tools
+        # Session management tools
         assert "acp_list_sessions" in tool_names
         assert "acp_get_session" in tool_names
         assert "acp_create_session" in tool_names
+        assert "acp_create_session_from_template" in tool_names
         assert "acp_delete_session" in tool_names
+        assert "acp_restart_session" in tool_names
+        assert "acp_clone_session" in tool_names
+        assert "acp_update_session" in tool_names
+        assert "acp_stop_session" not in tool_names  # stop is via PATCH, no dedicated tool name
+
+        # Observability tools
+        assert "acp_get_session_logs" in tool_names
+        assert "acp_get_session_transcript" in tool_names
+        assert "acp_get_session_metrics" in tool_names
+
+        # Label tools
+        assert "acp_label_resource" in tool_names
+        assert "acp_unlabel_resource" in tool_names
+        assert "acp_list_sessions_by_label" in tool_names
+        assert "acp_bulk_label_resources" in tool_names
+        assert "acp_bulk_unlabel_resources" in tool_names
+
+        # Bulk operation tools
         assert "acp_bulk_delete_sessions" in tool_names
+        assert "acp_bulk_stop_sessions" in tool_names
+        assert "acp_bulk_restart_sessions" in tool_names
+        assert "acp_bulk_delete_sessions_by_label" in tool_names
+        assert "acp_bulk_stop_sessions_by_label" in tool_names
+        assert "acp_bulk_restart_sessions_by_label" in tool_names
 
         # Cluster tools
         assert "acp_list_clusters" in tool_names
         assert "acp_whoami" in tool_names
         assert "acp_switch_cluster" in tool_names
+        assert "acp_login" in tool_names
 
     @pytest.mark.asyncio
     async def test_list_tools_count(self) -> None:
         """Test correct number of tools."""
         tools = await list_tools()
-        assert len(tools) == 8
+        assert len(tools) == 26
 
 
 class TestCallTool:
@@ -221,3 +246,93 @@ class TestCallTool:
 
             assert len(result) == 1
             assert "Test error" in result[0].text
+
+
+class TestCallToolBulkStop:
+    """Tests for bulk stop tool dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_stop_requires_confirm(self) -> None:
+        """Bulk stop without confirm should return validation error."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_bulk_stop_sessions",
+                {"project": "test-project", "sessions": ["s1", "s2"]},
+            )
+
+            assert "requires confirm=true" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_bulk_stop_with_confirm(self) -> None:
+        """Bulk stop with confirm should dispatch to client."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.bulk_stop_sessions = AsyncMock(return_value={"stopped": ["s1", "s2"], "failed": []})
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_bulk_stop_sessions",
+                {"project": "test-project", "sessions": ["s1", "s2"], "confirm": True},
+            )
+
+            assert "Successfully stopped 2" in result[0].text
+
+
+class TestCallToolRestartSession:
+    """Tests for restart session tool dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_restart_session_dispatch(self) -> None:
+        """Restart session should dispatch to client.restart_session."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.restart_session = AsyncMock(
+            return_value={"restarted": True, "message": "Successfully restarted session 's1'"}
+        )
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_restart_session",
+                {"project": "test-project", "session": "s1"},
+            )
+
+            assert len(result) == 1
+            assert "Successfully restarted" in result[0].text
+
+
+class TestCallToolLogin:
+    """Tests for login tool dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_login_dispatch(self) -> None:
+        """Login should dispatch to client.login."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {}
+        mock_client.login = AsyncMock(
+            return_value={
+                "authenticated": True,
+                "cluster": "test",
+                "server": "https://test.com",
+                "message": "Successfully authenticated to cluster 'test'",
+            }
+        )
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_login",
+                {"cluster": "test", "token": "my-token"},
+            )
+
+            assert len(result) == 1
+            assert "Authentication successful" in result[0].text

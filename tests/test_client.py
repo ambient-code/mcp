@@ -362,3 +362,517 @@ class TestCreateSession:
         manifest = result["manifest"]
         assert manifest["llmConfig"]["model"] == "claude-opus-4"
         assert manifest["timeout"] == 3600
+
+
+class TestRestartSession:
+    """Tests for restart_session."""
+
+    @pytest.mark.asyncio
+    async def test_restart_session_dry_run(self, client: ACPClient) -> None:
+        """Dry run should preview restart without executing."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "status": "stopped"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.restart_session("test-project", "session-1", dry_run=True)
+
+            assert result["dry_run"] is True
+            assert result["success"] is True
+            assert "Would restart" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_restart_session_success(self, client: ACPClient) -> None:
+        """Restart should PATCH with stopped=False."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "status": "running"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.restart_session("test-project", "session-1")
+
+            assert result["restarted"] is True
+            assert "Successfully restarted" in result["message"]
+
+            call_args = mock_http_client.request.call_args
+            assert call_args.kwargs["method"] == "PATCH"
+            assert call_args.kwargs["json"] == {"stopped": False}
+
+
+class TestStopSession:
+    """Tests for stop_session."""
+
+    @pytest.mark.asyncio
+    async def test_stop_session_dry_run(self, client: ACPClient) -> None:
+        """Dry run should preview stop without executing."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "status": "running"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.stop_session("test-project", "session-1", dry_run=True)
+
+            assert result["dry_run"] is True
+            assert result["success"] is True
+            assert "Would stop" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_stop_session_success(self, client: ACPClient) -> None:
+        """Stop should PATCH with stopped=True."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "status": "stopped"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.stop_session("test-project", "session-1")
+
+            assert result["stopped"] is True
+            assert "Successfully stopped" in result["message"]
+
+            call_args = mock_http_client.request.call_args
+            assert call_args.kwargs["method"] == "PATCH"
+            assert call_args.kwargs["json"] == {"stopped": True}
+
+
+class TestCloneSession:
+    """Tests for clone_session."""
+
+    @pytest.mark.asyncio
+    async def test_clone_session_dry_run(self, client: ACPClient) -> None:
+        """Dry run should GET source and return manifest without POSTing."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "source-1",
+            "initialPrompt": "original prompt",
+            "interactive": False,
+            "timeout": 900,
+            "llmConfig": {"model": "claude-sonnet-4"},
+            "repos": ["https://github.com/org/repo"],
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.clone_session("test-project", "source-1", "clone-name", dry_run=True)
+
+            assert result["dry_run"] is True
+            assert result["success"] is True
+            assert "Would clone" in result["message"]
+            assert result["manifest"]["displayName"] == "clone-name"
+            assert result["source_session"] == "source-1"
+
+    @pytest.mark.asyncio
+    async def test_clone_session_success(self, client: ACPClient) -> None:
+        """Clone should GET source then POST new session."""
+        source_response = MagicMock()
+        source_response.status_code = 200
+        source_response.json.return_value = {
+            "id": "source-1",
+            "initialPrompt": "original prompt",
+            "interactive": False,
+            "timeout": 900,
+            "llmConfig": {"model": "claude-sonnet-4"},
+        }
+
+        create_response = MagicMock()
+        create_response.status_code = 201
+        create_response.json.return_value = {"id": "cloned-abc12"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(side_effect=[source_response, create_response])
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.clone_session("test-project", "source-1", "my-clone")
+
+            assert result["created"] is True
+            assert result["session"] == "cloned-abc12"
+            assert result["source_session"] == "source-1"
+
+
+class TestUpdateSession:
+    """Tests for update_session."""
+
+    @pytest.mark.asyncio
+    async def test_update_session_display_name(self, client: ACPClient) -> None:
+        """Should update display name via PATCH."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "displayName": "new-name"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.update_session("test-project", "session-1", display_name="new-name")
+
+            assert result["updated"] is True
+            assert "Successfully updated" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_update_session_timeout(self, client: ACPClient) -> None:
+        """Should update timeout via PATCH."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "timeout": 1800}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.update_session("test-project", "session-1", timeout=1800)
+
+            assert result["updated"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_session_dry_run(self, client: ACPClient) -> None:
+        """Dry run should preview update without executing."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1", "displayName": "old-name"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.update_session("test-project", "session-1", display_name="new-name", dry_run=True)
+
+            assert result["dry_run"] is True
+            assert result["success"] is True
+            assert result["patch"] == {"displayName": "new-name"}
+
+    @pytest.mark.asyncio
+    async def test_update_session_no_fields_raises(self, client: ACPClient) -> None:
+        """Should raise ValueError when no fields provided."""
+        with pytest.raises(ValueError, match="No fields to update"):
+            await client.update_session("test-project", "session-1")
+
+
+class TestCreateSessionFromTemplate:
+    """Tests for create_session_from_template."""
+
+    @pytest.mark.asyncio
+    async def test_create_from_template_dry_run(self, client: ACPClient) -> None:
+        """Dry run should return template manifest."""
+        result = await client.create_session_from_template(
+            project="test-project",
+            template="bugfix",
+            display_name="Fix login bug",
+            dry_run=True,
+        )
+
+        assert result["dry_run"] is True
+        assert result["success"] is True
+        assert "bugfix" in result["message"]
+        manifest = result["manifest"]
+        assert manifest["displayName"] == "Fix login bug"
+        assert manifest["workflow"] == "bugfix"
+        assert manifest["llmConfig"]["model"] == "claude-sonnet-4"
+
+    @pytest.mark.asyncio
+    async def test_create_from_template_invalid_raises(self, client: ACPClient) -> None:
+        """Invalid template name should raise ValueError."""
+        with pytest.raises(ValueError, match="Unknown template"):
+            await client.create_session_from_template(
+                project="test-project",
+                template="nonexistent",
+                display_name="test",
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_from_template_success(self, client: ACPClient) -> None:
+        """Successful template creation should return session info."""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": "template-abc12"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.create_session_from_template(
+                project="test-project",
+                template="triage",
+                display_name="Triage issue",
+            )
+
+            assert result["created"] is True
+            assert result["session"] == "template-abc12"
+            assert result["template"] == "triage"
+
+
+class TestGetSessionLogs:
+    """Tests for get_session_logs."""
+
+    @pytest.mark.asyncio
+    async def test_get_session_logs_success(self, client: ACPClient) -> None:
+        """Should return logs text from _request_text."""
+        with patch.object(client, "_request_text", new_callable=AsyncMock, return_value="log line 1\nlog line 2"):
+            result = await client.get_session_logs("test-project", "session-1")
+
+            assert result["logs"] == "log line 1\nlog line 2"
+            assert result["session"] == "session-1"
+            assert result["tail_lines"] == 1000
+
+    @pytest.mark.asyncio
+    async def test_get_session_logs_error(self, client: ACPClient) -> None:
+        """Should return error dict when request fails."""
+        with patch.object(client, "_request_text", new_callable=AsyncMock, side_effect=ValueError("Not found")):
+            result = await client.get_session_logs("test-project", "session-1")
+
+            assert result["logs"] == ""
+            assert "Not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_session_logs_tail_lines_limit(self, client: ACPClient) -> None:
+        """Should reject tail_lines > 10000."""
+        with pytest.raises(ValueError, match="tail_lines cannot exceed 10000"):
+            await client.get_session_logs("test-project", "session-1", tail_lines=10001)
+
+
+class TestGetSessionTranscript:
+    """Tests for get_session_transcript."""
+
+    @pytest.mark.asyncio
+    async def test_get_session_transcript_success(self, client: ACPClient) -> None:
+        """Should return transcript data."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "messages": [{"role": "user", "content": "hello"}],
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.get_session_transcript("test-project", "session-1", format="json")
+
+            assert result["session"] == "session-1"
+            assert result["format"] == "json"
+            assert result["messages"] == [{"role": "user", "content": "hello"}]
+
+    @pytest.mark.asyncio
+    async def test_get_session_transcript_invalid_format(self, client: ACPClient) -> None:
+        """Invalid format should raise ValueError."""
+        with pytest.raises(ValueError, match="format must be"):
+            await client.get_session_transcript("test-project", "session-1", format="xml")
+
+
+class TestGetSessionMetrics:
+    """Tests for get_session_metrics."""
+
+    @pytest.mark.asyncio
+    async def test_get_session_metrics_success(self, client: ACPClient) -> None:
+        """Should return metrics data."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "total_tokens": 5000,
+            "duration_seconds": 120,
+            "tool_calls": 15,
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.get_session_metrics("test-project", "session-1")
+
+            assert result["session"] == "session-1"
+            assert result["total_tokens"] == 5000
+            assert result["duration_seconds"] == 120
+            assert result["tool_calls"] == 15
+
+
+class TestLabelSession:
+    """Tests for label_session."""
+
+    @pytest.mark.asyncio
+    async def test_label_session_success(self, client: ACPClient) -> None:
+        """Should add labels via PATCH."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.label_session("test-project", "session-1", {"env": "test", "team": "qa"})
+
+            assert result["labeled"] is True
+            assert result["labels_added"] == {"env": "test", "team": "qa"}
+            assert "2 label(s)" in result["message"]
+
+
+class TestUnlabelSession:
+    """Tests for unlabel_session."""
+
+    @pytest.mark.asyncio
+    async def test_unlabel_session_success(self, client: ACPClient) -> None:
+        """Should remove labels via PATCH."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "session-1"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.unlabel_session("test-project", "session-1", ["env", "team"])
+
+            assert result["unlabeled"] is True
+            assert result["labels_removed"] == ["env", "team"]
+            assert "2 label(s)" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_unlabel_session_empty_keys_raises(self, client: ACPClient) -> None:
+        """Should raise ValueError when label_keys is empty."""
+        with pytest.raises(ValueError, match="label_keys must not be empty"):
+            await client.unlabel_session("test-project", "session-1", [])
+
+
+class TestListSessionsByLabel:
+    """Tests for list_sessions_by_label."""
+
+    @pytest.mark.asyncio
+    async def test_list_sessions_by_label(self, client: ACPClient) -> None:
+        """Should list sessions matching label selectors."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "items": [{"id": "session-1", "status": "running"}],
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.list_sessions_by_label("test-project", {"env": "test"})
+
+            assert result["total"] == 1
+            assert result["sessions"][0]["id"] == "session-1"
+            assert result["labels_filter"] == {"env": "test"}
+
+
+class TestLabelValidation:
+    """Tests for _validate_labels."""
+
+    def test_validate_labels_valid(self, client: ACPClient) -> None:
+        """Valid labels should pass validation."""
+        client._validate_labels({"env": "production", "team": "qa"})
+        client._validate_labels({"app.version": "v1.2.3"})
+
+    def test_validate_labels_empty_raises(self, client: ACPClient) -> None:
+        """Empty labels dict should raise ValueError."""
+        with pytest.raises(ValueError, match="Labels must not be empty"):
+            client._validate_labels({})
+
+    def test_validate_labels_invalid_key(self, client: ACPClient) -> None:
+        """Invalid label key should raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid label key"):
+            client._validate_labels({"invalid key!": "value"})
+
+    def test_validate_labels_key_too_long(self, client: ACPClient) -> None:
+        """Label key exceeding 63 chars should raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid label key"):
+            client._validate_labels({"a" * 64: "value"})
+
+    def test_validate_labels_invalid_value(self, client: ACPClient) -> None:
+        """Invalid label value should raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid label value"):
+            client._validate_labels({"key": "invalid value!"})
+
+
+class TestBulkStopSessions:
+    """Tests for bulk_stop_sessions."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_stop_sessions(self, client: ACPClient) -> None:
+        """Should stop multiple sessions."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "s1", "status": "stopped"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_stop_sessions("test-project", ["s1", "s2"])
+
+            assert len(result["stopped"]) == 2
+            assert "s1" in result["stopped"]
+            assert "s2" in result["stopped"]
+
+
+class TestBulkRestartSessions:
+    """Tests for bulk_restart_sessions."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_restart_sessions(self, client: ACPClient) -> None:
+        """Should restart multiple sessions."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "s1", "status": "running"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_restart_sessions("test-project", ["s1", "s2"])
+
+            assert len(result["restarted"]) == 2
+            assert "s1" in result["restarted"]
+            assert "s2" in result["restarted"]
+
+
+class TestLogin:
+    """Tests for login."""
+
+    @pytest.mark.asyncio
+    async def test_login_success(self, client: ACPClient) -> None:
+        """Should authenticate to a cluster with a token."""
+        result = await client.login("test-cluster", token="new-token")
+
+        assert result["authenticated"] is True
+        assert result["cluster"] == "test-cluster"
+        assert "Successfully authenticated" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_login_unknown_cluster(self, client: ACPClient) -> None:
+        """Should fail for unknown cluster."""
+        result = await client.login("nonexistent-cluster")
+
+        assert result["authenticated"] is False
+        assert "Unknown cluster" in result["message"]
