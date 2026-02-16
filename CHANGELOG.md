@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.2.1 (2026-02-16)
+
+### Bug Fixes
+
+- **ci**: Remove uv cache from release workflow ([#33](https://github.com/ambient-code/mcp/pull/33),
+  [`fe142d3`](https://github.com/ambient-code/mcp/commit/fe142d3479220f6147fbcab53ab9cd9e2feb6ba9))
+
+The cache causes spurious failures in post-job cleanup when build steps are skipped (no new
+  release), marking the run as failed.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.2.0 (2026-02-16)
 
 ### Bug Fixes
@@ -62,6 +75,11 @@ Switch to authenticating via the ambient-code GitHub App using actions/create-gi
 Requires repo secrets: RELEASE_APP_ID, RELEASE_APP_PRIVATE_KEY
 
 Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.2.0
+  ([`4f61e97`](https://github.com/ambient-code/mcp/commit/4f61e9747092136a2fc3d2408a1923b833e9ec1b))
 
 ### Features
 
