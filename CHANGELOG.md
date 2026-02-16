@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.2.2 (2026-02-16)
+
+### Bug Fixes
+
+- **ci**: Disable uv cache in release workflow ([#34](https://github.com/ambient-code/mcp/pull/34),
+  [`5a28fff`](https://github.com/ambient-code/mcp/commit/5a28fff898faa86a0f5c7bb9e6dc1343b85cf670))
+
+When semantic-release determines no release is needed, the build/publish steps are skipped and uv is
+  never invoked. The post-job cache cleanup then fails because the cache directory was never
+  created, marking the entire run as failed.
+
+Disable caching since uv is only used conditionally (via uvx for builds).
+
+Fixes: https://github.com/ambient-code/mcp/actions/runs/22051441188
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.2.1 (2026-02-16)
 
 ### Bug Fixes
@@ -12,6 +30,11 @@ The cache causes spurious failures in post-job cleanup when build steps are skip
   release), marking the run as failed.
 
 Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.2.1
+  ([`b01f5f9`](https://github.com/ambient-code/mcp/commit/b01f5f9d6caeff3624b16f9e480756175d1a56fb))
 
 
 ## v0.2.0 (2026-02-16)
