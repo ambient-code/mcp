@@ -813,6 +813,203 @@ class TestLabelValidation:
             client._validate_labels({"key": "invalid value!"})
 
 
+class TestBulkDeleteDryRun:
+    """Tests for bulk delete dry_run path."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_dry_run(self, client: ACPClient) -> None:
+        """Dry run should preview deletes without executing."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "s1", "status": "running"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_delete_sessions("test-project", ["s1", "s2"], dry_run=True)
+
+            assert result["dry_run"] is True
+            assert len(result["dry_run_info"]["would_execute"]) == 2
+            assert result["dry_run_info"]["would_execute"][0]["session"] == "s1"
+
+
+class TestBulkDeleteFailure:
+    """Tests for _run_bulk failure path."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_partial_failure(self, client: ACPClient) -> None:
+        """Individual failures in bulk delete should be collected."""
+        success_response = MagicMock()
+        success_response.status_code = 204
+
+        fail_response = MagicMock()
+        fail_response.status_code = 404
+        fail_response.text = "not found"
+        fail_response.json.return_value = {"error": "not found"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(side_effect=[success_response, fail_response])
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_delete_sessions("test-project", ["s1", "s2"])
+
+            assert "s1" in result["deleted"]
+            assert len(result["failed"]) == 1
+            assert result["failed"][0]["session"] == "s2"
+
+
+class TestBulkByLabel:
+    """Tests for _run_bulk_by_label pipeline."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_by_label(self, client: ACPClient) -> None:
+        """Should resolve labels to sessions, then delete them."""
+        list_response = MagicMock()
+        list_response.status_code = 200
+        list_response.json.return_value = {"items": [{"id": "s1"}, {"id": "s2"}]}
+
+        delete_response = MagicMock()
+        delete_response.status_code = 204
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(side_effect=[list_response, delete_response, delete_response])
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_delete_sessions_by_label("test-project", {"env": "test"})
+
+            assert "s1" in result["deleted"]
+            assert "s2" in result["deleted"]
+            assert result["labels_filter"] == {"env": "test"}
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_by_label_no_matches(self, client: ACPClient) -> None:
+        """Should return empty results when no sessions match labels."""
+        list_response = MagicMock()
+        list_response.status_code = 200
+        list_response.json.return_value = {"items": []}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=list_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_delete_sessions_by_label("test-project", {"env": "nonexistent"})
+
+            assert result["deleted"] == []
+            assert result["failed"] == []
+            assert "No sessions match" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_bulk_stop_by_label(self, client: ACPClient) -> None:
+        """Should resolve labels to sessions, then stop them."""
+        list_response = MagicMock()
+        list_response.status_code = 200
+        list_response.json.return_value = {"items": [{"id": "s1"}]}
+
+        stop_response = MagicMock()
+        stop_response.status_code = 200
+        stop_response.json.return_value = {"id": "s1", "status": "stopped"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(side_effect=[list_response, stop_response])
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_stop_sessions_by_label("test-project", {"team": "qa"})
+
+            assert "s1" in result["stopped"]
+            assert result["labels_filter"] == {"team": "qa"}
+
+    @pytest.mark.asyncio
+    async def test_bulk_restart_by_label(self, client: ACPClient) -> None:
+        """Should resolve labels to sessions, then restart them."""
+        list_response = MagicMock()
+        list_response.status_code = 200
+        list_response.json.return_value = {"items": [{"id": "s1"}]}
+
+        restart_response = MagicMock()
+        restart_response.status_code = 200
+        restart_response.json.return_value = {"id": "s1", "status": "running"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(side_effect=[list_response, restart_response])
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_restart_sessions_by_label("test-project", {"team": "qa"})
+
+            assert "s1" in result["restarted"]
+            assert result["labels_filter"] == {"team": "qa"}
+
+
+class TestBulkLabelSessions:
+    """Tests for bulk_label_sessions."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_label_sessions_success(self, client: ACPClient) -> None:
+        """Should label multiple sessions."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "s1"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_label_sessions("test-project", ["s1", "s2"], {"env": "test"})
+
+            assert "s1" in result["labeled"]
+            assert "s2" in result["labeled"]
+            assert result["labels"] == {"env": "test"}
+
+    @pytest.mark.asyncio
+    async def test_bulk_label_sessions_dry_run(self, client: ACPClient) -> None:
+        """Dry run should preview labeling without executing."""
+        result = await client.bulk_label_sessions("test-project", ["s1", "s2"], {"env": "test"}, dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["sessions"] == ["s1", "s2"]
+        assert result["labels"] == {"env": "test"}
+        assert "Would add 1 label(s) to 2 session(s)" in result["message"]
+
+
+class TestBulkUnlabelSessions:
+    """Tests for bulk_unlabel_sessions."""
+
+    @pytest.mark.asyncio
+    async def test_bulk_unlabel_sessions_success(self, client: ACPClient) -> None:
+        """Should remove labels from multiple sessions."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "s1"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.bulk_unlabel_sessions("test-project", ["s1", "s2"], ["env", "team"])
+
+            assert "s1" in result["unlabeled"]
+            assert "s2" in result["unlabeled"]
+            assert result["label_keys"] == ["env", "team"]
+
+    @pytest.mark.asyncio
+    async def test_bulk_unlabel_sessions_dry_run(self, client: ACPClient) -> None:
+        """Dry run should preview unlabeling without executing."""
+        result = await client.bulk_unlabel_sessions("test-project", ["s1", "s2"], ["env"], dry_run=True)
+
+        assert result["dry_run"] is True
+        assert result["sessions"] == ["s1", "s2"]
+        assert result["label_keys"] == ["env"]
+        assert "Would remove 1 label(s) from 2 session(s)" in result["message"]
+
+
 class TestBulkStopSessions:
     """Tests for bulk_stop_sessions."""
 
