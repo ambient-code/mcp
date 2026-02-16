@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from utils.pylogger import get_python_logger
 
@@ -187,11 +187,10 @@ class Settings(BaseSettings):
             raise ValueError(f"log_level must be one of {valid_levels}")
         return v_upper
 
-    class Config:
-        """Pydantic config."""
-
-        env_prefix = "MCP_ACP_"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_prefix="MCP_ACP_",
+        case_sensitive=False,
+    )
 
 
 def load_settings() -> Settings:
