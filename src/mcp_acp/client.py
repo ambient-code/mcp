@@ -4,6 +4,7 @@ This client communicates with the public-api gateway service which provides
 a simplified REST API for managing AgenticSessions.
 """
 
+import json
 import os
 import re
 from datetime import datetime, timedelta
@@ -11,29 +12,42 @@ from typing import Any
 
 import httpx
 
-from mcp_acp.settings import load_clusters_config, load_settings
+from mcp_acp.settings import _acpctl_config_path, load_clusters_config, load_settings
 from utils.pylogger import get_python_logger
 
 logger = get_python_logger()
 
 LABEL_VALUE_PATTERN = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
+
+def _read_acpctl_token() -> str | None:
+    """Read token from the acpctl CLI config file as a last-resort fallback.
+
+    Used when clusters.yaml exists but a cluster entry has no token.
+    """
+    try:
+        data = json.loads(_acpctl_config_path().read_text())
+        return data.get("access_token") or None
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+
+
 SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "triage": {
-        "workflow": "triage",
-        "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.7},
+        "task": "Triage: investigate and classify the issue.",
+        "model": "claude-sonnet-4",
     },
     "bugfix": {
-        "workflow": "bugfix",
-        "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.3},
+        "task": "Bugfix: diagnose and fix the reported bug.",
+        "model": "claude-sonnet-4",
     },
     "feature": {
-        "workflow": "feature-development",
-        "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.5},
+        "task": "Feature development: implement the requested feature.",
+        "model": "claude-sonnet-4",
     },
     "exploration": {
-        "workflow": "codebase-exploration",
-        "llmConfig": {"model": "claude-sonnet-4", "temperature": 0.8},
+        "task": "Codebase exploration: explore and document the codebase.",
+        "model": "claude-sonnet-4",
     },
 }
 
@@ -97,12 +111,20 @@ class ACPClient:
         }
 
     def _get_token(self, cluster_config: dict[str, Any]) -> str:
-        """Get authentication token for a cluster."""
-        token = cluster_config.get("token") or os.getenv("ACP_TOKEN")
+        """Get authentication token for a cluster.
+
+        Resolution order:
+        1. Per-cluster token in clusters.yaml
+        2. ACP_TOKEN environment variable
+        3. acpctl CLI config (~/.config/ambient/config.json)
+        """
+        token = cluster_config.get("token") or os.getenv("ACP_TOKEN") or _read_acpctl_token()
 
         if not token:
             raise ValueError(
-                "No authentication token available. Set 'token' in clusters.yaml or ACP_TOKEN environment variable."
+                "No authentication token available. "
+                "Run 'acpctl login --token <token> --url <url>', "
+                "set 'token' in clusters.yaml, or set ACP_TOKEN environment variable."
             )
 
         return token
@@ -338,26 +360,22 @@ class ACPClient:
         initial_prompt: str,
         display_name: str | None = None,
         repos: list[str] | None = None,
-        interactive: bool = False,
         model: str = "claude-sonnet-4",
-        timeout: int = 900,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         """Create an AgenticSession with a custom prompt."""
         self._validate_input(project, "project")
 
         session_data: dict[str, Any] = {
-            "initialPrompt": initial_prompt,
-            "interactive": interactive,
-            "llmConfig": {"model": model},
-            "timeout": timeout,
+            "task": initial_prompt,
+            "model": model,
         }
 
         if display_name:
             session_data["displayName"] = display_name
 
         if repos:
-            session_data["repos"] = repos
+            session_data["repos"] = [{"url": r} for r in repos]
 
         if dry_run:
             return {
@@ -401,7 +419,7 @@ class ACPClient:
         }
 
         if repos:
-            session_data["repos"] = repos
+            session_data["repos"] = [{"url": r} for r in repos]
 
         if dry_run:
             return {
@@ -524,14 +542,10 @@ class ACPClient:
         source = await self._request("GET", f"/v1/sessions/{source_session}", project)
 
         clone_data: dict[str, Any] = {
-            "displayName": new_display_name,
-            "initialPrompt": source.get("initialPrompt", ""),
-            "interactive": source.get("interactive", False),
-            "timeout": source.get("timeout", 900),
+            "task": source.get("task", ""),
+            "model": source.get("model", "claude-sonnet-4"),
         }
 
-        if source.get("llmConfig"):
-            clone_data["llmConfig"] = source["llmConfig"]
         if source.get("repos"):
             clone_data["repos"] = source["repos"]
 

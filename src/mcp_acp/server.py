@@ -111,13 +111,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "display_name": {"type": "string", "description": "Human-readable display name"},
                     "repos": {"type": "array", "items": {"type": "string"}, "description": "Repository URLs to clone"},
-                    "interactive": {
-                        "type": "boolean",
-                        "description": "Create an interactive session",
-                        "default": False,
-                    },
                     "model": {"type": "string", "description": "LLM model to use", "default": "claude-sonnet-4"},
-                    "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 900, "minimum": 60},
                     "dry_run": _DRY_RUN,
                 },
                 "required": ["initial_prompt"],
@@ -491,9 +485,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 initial_prompt=arguments["initial_prompt"],
                 display_name=arguments.get("display_name"),
                 repos=arguments.get("repos"),
-                interactive=arguments.get("interactive", False),
                 model=arguments.get("model", "claude-sonnet-4"),
-                timeout=arguments.get("timeout", 900),
                 dry_run=arguments.get("dry_run", False),
             )
             text = format_session_created(result)
