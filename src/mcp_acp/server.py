@@ -24,6 +24,8 @@ from .formatters import (
     format_transcript,
     format_whoami,
 )
+from .tracing import flush as flush_tracing
+from .tracing import trace_tool_call
 
 logger = get_python_logger()
 
@@ -445,233 +447,250 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
     client = get_client()
 
-    try:
-        # Auto-fill project from default if not provided
-        if name not in TOOLS_WITHOUT_PROJECT and not arguments.get("project"):
-            cluster_name = client.clusters_config.default_cluster
-            if cluster_name:
-                cluster = client.clusters_config.clusters.get(cluster_name)
-                if cluster and cluster.default_project:
-                    arguments["project"] = cluster.default_project
-                    logger.info("project_autofilled", project=cluster.default_project)
+    metadata = {
+        "project": arguments.get("project", ""),
+        "dry_run": arguments.get("dry_run", False),
+    }
 
-        # Confirmation enforcement for destructive bulk operations
-        if name in TOOLS_REQUIRING_CONFIRMATION:
-            if not arguments.get("dry_run") and not arguments.get("confirm"):
-                op = name.replace("acp_bulk_", "").replace("_", " ")
-                raise ValueError(f"Bulk {op} requires confirm=true. Use dry_run=true to preview first.")
+    async with trace_tool_call(name, safe_args, metadata) as trace_ctx:
+        try:
+            # Auto-fill project from default if not provided
+            if name not in TOOLS_WITHOUT_PROJECT and not arguments.get("project"):
+                cluster_name = client.clusters_config.default_cluster
+                if cluster_name:
+                    cluster = client.clusters_config.clusters.get(cluster_name)
+                    if cluster and cluster.default_project:
+                        arguments["project"] = cluster.default_project
+                        logger.info("project_autofilled", project=cluster.default_project)
 
-        # ── Dispatch ─────────────────────────────────────────────────
-        project = arguments.get("project", "")
+            # Confirmation enforcement for destructive bulk operations
+            if name in TOOLS_REQUIRING_CONFIRMATION:
+                if not arguments.get("dry_run") and not arguments.get("confirm"):
+                    op = name.replace("acp_bulk_", "").replace("_", " ")
+                    raise ValueError(f"Bulk {op} requires confirm=true. Use dry_run=true to preview first.")
 
-        # Session management
-        if name == "acp_list_sessions":
-            result = await client.list_sessions(
-                project=project,
-                status=arguments.get("status"),
-                older_than=arguments.get("older_than"),
-                sort_by=arguments.get("sort_by"),
-                limit=arguments.get("limit"),
+            # ── Dispatch ─────────────────────────────────────────────────
+            project = arguments.get("project", "")
+
+            # Session management
+            if name == "acp_list_sessions":
+                result = await client.list_sessions(
+                    project=project,
+                    status=arguments.get("status"),
+                    older_than=arguments.get("older_than"),
+                    sort_by=arguments.get("sort_by"),
+                    limit=arguments.get("limit"),
+                )
+                text = format_sessions_list(result)
+
+            elif name == "acp_get_session":
+                result = await client.get_session(project=project, session=arguments["session"])
+                text = format_result(result)
+
+            elif name == "acp_create_session":
+                result = await client.create_session(
+                    project=project,
+                    initial_prompt=arguments["initial_prompt"],
+                    display_name=arguments.get("display_name"),
+                    repos=arguments.get("repos"),
+                    model=arguments.get("model", "claude-sonnet-4"),
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_session_created(result)
+
+            elif name == "acp_create_session_from_template":
+                result = await client.create_session_from_template(
+                    project=project,
+                    template=arguments["template"],
+                    display_name=arguments["display_name"],
+                    repos=arguments.get("repos"),
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_session_created(result)
+
+            elif name == "acp_delete_session":
+                result = await client.delete_session(
+                    project=project, session=arguments["session"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_result(result)
+
+            elif name == "acp_restart_session":
+                result = await client.restart_session(
+                    project=project, session=arguments["session"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_result(result)
+
+            elif name == "acp_clone_session":
+                result = await client.clone_session(
+                    project=project,
+                    source_session=arguments["source_session"],
+                    new_display_name=arguments["new_display_name"],
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_session_created(result)
+
+            elif name == "acp_update_session":
+                result = await client.update_session(
+                    project=project,
+                    session=arguments["session"],
+                    display_name=arguments.get("display_name"),
+                    timeout=arguments.get("timeout"),
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_result(result)
+
+            # Observability
+            elif name == "acp_get_session_logs":
+                result = await client.get_session_logs(
+                    project=project,
+                    session=arguments["session"],
+                    container=arguments.get("container"),
+                    tail_lines=arguments.get("tail_lines", 1000),
+                )
+                text = format_logs(result)
+
+            elif name == "acp_get_session_transcript":
+                result = await client.get_session_transcript(
+                    project=project,
+                    session=arguments["session"],
+                    format=arguments.get("format", "json"),
+                )
+                text = format_transcript(result)
+
+            elif name == "acp_get_session_metrics":
+                result = await client.get_session_metrics(project=project, session=arguments["session"])
+                text = format_metrics(result)
+
+            # Labels
+            elif name == "acp_label_resource":
+                result = await client.label_session(
+                    project=project, session=arguments["name"], labels=arguments["labels"]
+                )
+                text = format_labels(result)
+
+            elif name == "acp_unlabel_resource":
+                result = await client.unlabel_session(
+                    project=project, session=arguments["name"], label_keys=arguments["label_keys"]
+                )
+                text = format_labels(result)
+
+            elif name == "acp_list_sessions_by_label":
+                result = await client.list_sessions_by_label(project=project, labels=arguments["labels"])
+                text = format_sessions_list(result)
+
+            elif name == "acp_bulk_label_resources":
+                result = await client.bulk_label_sessions(
+                    project=project,
+                    sessions=arguments["sessions"],
+                    labels=arguments["labels"],
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_labels(result)
+
+            elif name == "acp_bulk_unlabel_resources":
+                result = await client.bulk_unlabel_sessions(
+                    project=project,
+                    sessions=arguments["sessions"],
+                    label_keys=arguments["label_keys"],
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_labels(result)
+
+            # Bulk operations (named)
+            elif name == "acp_bulk_delete_sessions":
+                result = await client.bulk_delete_sessions(
+                    project=project, sessions=arguments["sessions"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_bulk_result(result, "delete")
+
+            elif name == "acp_bulk_stop_sessions":
+                result = await client.bulk_stop_sessions(
+                    project=project, sessions=arguments["sessions"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_bulk_result(result, "stop")
+
+            elif name == "acp_bulk_restart_sessions":
+                result = await client.bulk_restart_sessions(
+                    project=project, sessions=arguments["sessions"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_bulk_result(result, "restart")
+
+            # Bulk operations (by label)
+            elif name == "acp_bulk_delete_sessions_by_label":
+                result = await client.bulk_delete_sessions_by_label(
+                    project=project, labels=arguments["labels"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_bulk_result(result, "delete")
+
+            elif name == "acp_bulk_stop_sessions_by_label":
+                result = await client.bulk_stop_sessions_by_label(
+                    project=project, labels=arguments["labels"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_bulk_result(result, "stop")
+
+            elif name == "acp_bulk_restart_sessions_by_label":
+                result = await client.bulk_restart_sessions_by_label(
+                    project=project, labels=arguments["labels"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_bulk_result(result, "restart")
+
+            # Cluster management
+            elif name == "acp_list_clusters":
+                result = client.list_clusters()
+                text = format_clusters(result)
+
+            elif name == "acp_whoami":
+                result = await client.whoami()
+                text = format_whoami(result)
+
+            elif name == "acp_switch_cluster":
+                result = await client.switch_cluster(arguments["cluster"])
+                text = format_result(result)
+
+            elif name == "acp_login":
+                result = await client.login(cluster=arguments["cluster"], token=arguments.get("token"))
+                text = format_login(result)
+
+            else:
+                logger.warning("unknown_tool_requested", tool=name)
+                return [TextContent(type="text", text=f"Unknown tool: {name}")]
+
+            elapsed = time.time() - start_time
+            logger.info("tool_call_completed", tool=name, elapsed_seconds=round(elapsed, 2))
+
+            trace_ctx.set_output({"status": "success"})
+            return [TextContent(type="text", text=text)]
+
+        except ValueError as e:
+            elapsed = time.time() - start_time
+            logger.warning("tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
+            trace_ctx.set_output({"status": "validation_error", "error": str(e)})
+            return [TextContent(type="text", text=f"Validation Error: {str(e)}")]
+        except TimeoutError as e:
+            elapsed = time.time() - start_time
+            logger.error("tool_timeout", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
+            trace_ctx.set_output({"status": "timeout_error", "error": str(e)})
+            return [TextContent(type="text", text=f"Timeout Error: {str(e)}")]
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(
+                "tool_unexpected_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e), exc_info=True
             )
-            text = format_sessions_list(result)
-
-        elif name == "acp_get_session":
-            result = await client.get_session(project=project, session=arguments["session"])
-            text = format_result(result)
-
-        elif name == "acp_create_session":
-            result = await client.create_session(
-                project=project,
-                initial_prompt=arguments["initial_prompt"],
-                display_name=arguments.get("display_name"),
-                repos=arguments.get("repos"),
-                model=arguments.get("model", "claude-sonnet-4"),
-                dry_run=arguments.get("dry_run", False),
-            )
-            text = format_session_created(result)
-
-        elif name == "acp_create_session_from_template":
-            result = await client.create_session_from_template(
-                project=project,
-                template=arguments["template"],
-                display_name=arguments["display_name"],
-                repos=arguments.get("repos"),
-                dry_run=arguments.get("dry_run", False),
-            )
-            text = format_session_created(result)
-
-        elif name == "acp_delete_session":
-            result = await client.delete_session(
-                project=project, session=arguments["session"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_result(result)
-
-        elif name == "acp_restart_session":
-            result = await client.restart_session(
-                project=project, session=arguments["session"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_result(result)
-
-        elif name == "acp_clone_session":
-            result = await client.clone_session(
-                project=project,
-                source_session=arguments["source_session"],
-                new_display_name=arguments["new_display_name"],
-                dry_run=arguments.get("dry_run", False),
-            )
-            text = format_session_created(result)
-
-        elif name == "acp_update_session":
-            result = await client.update_session(
-                project=project,
-                session=arguments["session"],
-                display_name=arguments.get("display_name"),
-                timeout=arguments.get("timeout"),
-                dry_run=arguments.get("dry_run", False),
-            )
-            text = format_result(result)
-
-        # Observability
-        elif name == "acp_get_session_logs":
-            result = await client.get_session_logs(
-                project=project,
-                session=arguments["session"],
-                container=arguments.get("container"),
-                tail_lines=arguments.get("tail_lines", 1000),
-            )
-            text = format_logs(result)
-
-        elif name == "acp_get_session_transcript":
-            result = await client.get_session_transcript(
-                project=project,
-                session=arguments["session"],
-                format=arguments.get("format", "json"),
-            )
-            text = format_transcript(result)
-
-        elif name == "acp_get_session_metrics":
-            result = await client.get_session_metrics(project=project, session=arguments["session"])
-            text = format_metrics(result)
-
-        # Labels
-        elif name == "acp_label_resource":
-            result = await client.label_session(project=project, session=arguments["name"], labels=arguments["labels"])
-            text = format_labels(result)
-
-        elif name == "acp_unlabel_resource":
-            result = await client.unlabel_session(
-                project=project, session=arguments["name"], label_keys=arguments["label_keys"]
-            )
-            text = format_labels(result)
-
-        elif name == "acp_list_sessions_by_label":
-            result = await client.list_sessions_by_label(project=project, labels=arguments["labels"])
-            text = format_sessions_list(result)
-
-        elif name == "acp_bulk_label_resources":
-            result = await client.bulk_label_sessions(
-                project=project,
-                sessions=arguments["sessions"],
-                labels=arguments["labels"],
-                dry_run=arguments.get("dry_run", False),
-            )
-            text = format_labels(result)
-
-        elif name == "acp_bulk_unlabel_resources":
-            result = await client.bulk_unlabel_sessions(
-                project=project,
-                sessions=arguments["sessions"],
-                label_keys=arguments["label_keys"],
-                dry_run=arguments.get("dry_run", False),
-            )
-            text = format_labels(result)
-
-        # Bulk operations (named)
-        elif name == "acp_bulk_delete_sessions":
-            result = await client.bulk_delete_sessions(
-                project=project, sessions=arguments["sessions"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_bulk_result(result, "delete")
-
-        elif name == "acp_bulk_stop_sessions":
-            result = await client.bulk_stop_sessions(
-                project=project, sessions=arguments["sessions"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_bulk_result(result, "stop")
-
-        elif name == "acp_bulk_restart_sessions":
-            result = await client.bulk_restart_sessions(
-                project=project, sessions=arguments["sessions"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_bulk_result(result, "restart")
-
-        # Bulk operations (by label)
-        elif name == "acp_bulk_delete_sessions_by_label":
-            result = await client.bulk_delete_sessions_by_label(
-                project=project, labels=arguments["labels"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_bulk_result(result, "delete")
-
-        elif name == "acp_bulk_stop_sessions_by_label":
-            result = await client.bulk_stop_sessions_by_label(
-                project=project, labels=arguments["labels"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_bulk_result(result, "stop")
-
-        elif name == "acp_bulk_restart_sessions_by_label":
-            result = await client.bulk_restart_sessions_by_label(
-                project=project, labels=arguments["labels"], dry_run=arguments.get("dry_run", False)
-            )
-            text = format_bulk_result(result, "restart")
-
-        # Cluster management
-        elif name == "acp_list_clusters":
-            result = client.list_clusters()
-            text = format_clusters(result)
-
-        elif name == "acp_whoami":
-            result = await client.whoami()
-            text = format_whoami(result)
-
-        elif name == "acp_switch_cluster":
-            result = await client.switch_cluster(arguments["cluster"])
-            text = format_result(result)
-
-        elif name == "acp_login":
-            result = await client.login(cluster=arguments["cluster"], token=arguments.get("token"))
-            text = format_login(result)
-
-        else:
-            logger.warning("unknown_tool_requested", tool=name)
-            return [TextContent(type="text", text=f"Unknown tool: {name}")]
-
-        elapsed = time.time() - start_time
-        logger.info("tool_call_completed", tool=name, elapsed_seconds=round(elapsed, 2))
-
-        return [TextContent(type="text", text=text)]
-
-    except ValueError as e:
-        elapsed = time.time() - start_time
-        logger.warning("tool_validation_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
-        return [TextContent(type="text", text=f"Validation Error: {str(e)}")]
-    except TimeoutError as e:
-        elapsed = time.time() - start_time
-        logger.error("tool_timeout", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e))
-        return [TextContent(type="text", text=f"Timeout Error: {str(e)}")]
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error("tool_unexpected_error", tool=name, elapsed_seconds=round(elapsed, 2), error=str(e), exc_info=True)
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+            trace_ctx.set_output({"status": "error", "error": str(e)})
+            return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
 async def main() -> None:
     """Run the MCP server."""
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options(),
-        )
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await app.run(
+                read_stream,
+                write_stream,
+                app.create_initialization_options(),
+            )
+    finally:
+        flush_tracing()
 
 
 def run() -> None:
