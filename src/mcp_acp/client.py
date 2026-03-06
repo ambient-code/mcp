@@ -14,7 +14,7 @@ import httpx
 
 from mcp_acp.settings import _acpctl_config_path, load_clusters_config, load_settings
 from mcp_acp.tracing import trace_http_request
-from utils.pylogger import get_python_logger
+from mcp_acp.utils.pylogger import get_python_logger
 
 logger = get_python_logger()
 

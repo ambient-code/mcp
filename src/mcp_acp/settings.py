@@ -9,7 +9,7 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from utils.pylogger import get_python_logger
+from mcp_acp.utils.pylogger import get_python_logger
 
 logger = get_python_logger()
 
