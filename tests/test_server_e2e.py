@@ -2,8 +2,17 @@
 
 This module tests the complete flow from tool call through the client to HTTP requests,
 mocking only the HTTP transport layer to verify the full integration.
+
+Test Categories:
+- Session Management: CRUD operations for AgenticSessions
+- Observability: Logs, transcripts, and metrics retrieval
+- Labels: Adding, removing, and filtering by labels
+- Bulk Operations: Multi-session operations with confirmation
+- Cluster Management: Multi-cluster configuration and auth
+- Error Handling: HTTP errors, validation, and edge cases
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -17,7 +26,7 @@ from mcp_acp.server import call_tool, list_tools
 
 @pytest.fixture
 def mock_clusters_config():
-    """Create mock clusters configuration."""
+    """Create mock clusters configuration with a single test cluster."""
     cluster = MagicMock()
     cluster.server = "https://api.test.example.com"
     cluster.default_project = "test-project"
@@ -39,10 +48,14 @@ def mock_settings():
 
 
 def make_response(status_code: int = 200, json_data: dict | None = None, text: str = "") -> httpx.Response:
-    """Create a mock httpx Response."""
-    if json_data is not None:
-        import json
+    """Create a mock httpx Response.
 
+    Args:
+        status_code: HTTP status code
+        json_data: JSON response body (takes precedence over text)
+        text: Plain text response body
+    """
+    if json_data is not None:
         content = json.dumps(json_data).encode()
         headers = {"content-type": "application/json"}
     else:
@@ -57,34 +70,59 @@ def make_response(status_code: int = 200, json_data: dict | None = None, text: s
     )
 
 
+class MockHTTPClient:
+    """Mock HTTP client that returns predefined responses based on method and path.
+
+    Supports:
+    - Setting responses for specific method/path combinations
+    - Recording all HTTP calls for verification
+    - Default successful response for unconfigured paths
+    """
+
+    def __init__(self):
+        self.responses: dict[tuple[str, str], httpx.Response] = {}
+        self.calls: list[dict] = []
+        self.is_closed = False
+
+    def set_response(self, method: str, path_contains: str, response: httpx.Response):
+        """Set a response for a specific method/path combination."""
+        self.responses[(method.upper(), path_contains)] = response
+
+    async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Mock request that returns configured responses."""
+        self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+
+        # Try to find a matching response (more specific paths first)
+        for (m, path), response in sorted(
+            self.responses.items(), key=lambda x: len(x[0][1]), reverse=True
+        ):
+            if method.upper() == m and path in url:
+                return response
+
+        # Default successful response
+        return make_response(200, {"success": True})
+
+    async def aclose(self):
+        """Close the mock client."""
+        self.is_closed = True
+
+    def get_calls_for(self, method: str, path_contains: str = "") -> list[dict]:
+        """Get all recorded calls matching method and optional path substring."""
+        return [
+            c
+            for c in self.calls
+            if c["method"].upper() == method.upper() and path_contains in c["url"]
+        ]
+
+    def assert_called_with(self, method: str, path_contains: str):
+        """Assert that at least one call was made with the given method and path."""
+        matching = self.get_calls_for(method, path_contains)
+        assert matching, f"No {method} call to '{path_contains}' found. Calls: {self.calls}"
+
+
 @pytest.fixture
 def mock_http_client():
-    """Create a mock HTTP client with predefined responses."""
-
-    class MockHTTPClient:
-        def __init__(self):
-            self.responses: dict[tuple[str, str], httpx.Response] = {}
-            self.calls: list[dict] = []
-            self.is_closed = False
-
-        def set_response(self, method: str, path_contains: str, response: httpx.Response):
-            """Set a response for a specific method/path combination."""
-            self.responses[(method.upper(), path_contains)] = response
-
-        async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
-            """Mock request that returns configured responses."""
-            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-
-            for (m, path), response in self.responses.items():
-                if method.upper() == m and path in url:
-                    return response
-
-            # Default successful response
-            return make_response(200, {"success": True})
-
-        async def aclose(self):
-            self.is_closed = True
-
+    """Create a fresh mock HTTP client for each test."""
     return MockHTTPClient()
 
 
@@ -989,3 +1027,95 @@ class TestCompleteWorkflowE2E:
                 {"project": "test-project", "session": "lifecycle-session"},
             )
         assert "delete" in delete_result[0].text.lower() or "success" in delete_result[0].text.lower()
+
+
+# ── Test: Additional Edge Cases ──────────────────────────────────────────────
+
+
+class TestAdditionalEdgeCasesE2E:
+    """Additional edge case tests for comprehensive coverage."""
+
+    @pytest.mark.asyncio
+    async def test_create_session_with_repos(self, client_with_mock_http, mock_http_client):
+        """Test creating a session with repository URLs."""
+        mock_http_client.set_response("POST", "/v1/sessions", make_response(201, {"id": "repo-session"}))
+
+        with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
+            result = await call_tool(
+                "acp_create_session",
+                {
+                    "project": "test-project",
+                    "initial_prompt": "Review the code",
+                    "repos": ["https://github.com/org/repo1", "https://github.com/org/repo2"],
+                },
+            )
+
+        assert len(result) == 1
+        assert "repo-session" in result[0].text
+        mock_http_client.assert_called_with("POST", "/v1/sessions")
+
+    @pytest.mark.asyncio
+    async def test_invalid_template_name(self, client_with_mock_http):
+        """Test validation error for invalid template name."""
+        with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
+            result = await call_tool(
+                "acp_create_session_from_template",
+                {
+                    "project": "test-project",
+                    "template": "nonexistent-template",
+                    "display_name": "Test",
+                },
+            )
+
+        assert len(result) == 1
+        assert "unknown template" in result[0].text.lower() or "error" in result[0].text.lower()
+
+    @pytest.mark.asyncio
+    async def test_update_session_no_fields(self, client_with_mock_http):
+        """Test update session fails when no fields provided."""
+        with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
+            result = await call_tool(
+                "acp_update_session",
+                {"project": "test-project", "session": "session-001"},
+            )
+
+        assert len(result) == 1
+        assert "no fields" in result[0].text.lower() or "error" in result[0].text.lower()
+
+    @pytest.mark.asyncio
+    async def test_bulk_by_label_no_matches(self, client_with_mock_http, mock_http_client):
+        """Test bulk operation by label when no sessions match."""
+        mock_http_client.set_response("GET", "/v1/sessions", make_response(200, {"items": []}))
+
+        with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
+            result = await call_tool(
+                "acp_bulk_delete_sessions_by_label",
+                {"project": "test-project", "labels": {"env": "nonexistent"}, "confirm": True},
+            )
+
+        assert len(result) == 1
+        assert "no sessions" in result[0].text.lower() or "0" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_empty_sessions_list(self, client_with_mock_http, mock_http_client):
+        """Test listing sessions returns empty list gracefully."""
+        mock_http_client.set_response("GET", "/v1/sessions", make_response(200, {"items": []}))
+
+        with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
+            result = await call_tool("acp_list_sessions", {"project": "test-project"})
+
+        assert len(result) == 1
+        assert "0" in result[0].text or "no" in result[0].text.lower()
+
+    @pytest.mark.asyncio
+    async def test_delete_verifies_http_call(self, client_with_mock_http, mock_http_client):
+        """Test delete session makes correct HTTP call."""
+        mock_http_client.set_response("DELETE", "/v1/sessions/verify-delete", make_response(204))
+
+        with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
+            await call_tool(
+                "acp_delete_session",
+                {"project": "test-project", "session": "verify-delete"},
+            )
+
+        mock_http_client.assert_called_with("DELETE", "/v1/sessions/verify-delete")
