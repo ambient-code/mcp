@@ -185,6 +185,18 @@ class Settings(BaseSettings):
     )
 
 
+def _acpctl_config_path() -> Path:
+    """Return path to acpctl CLI config file.
+
+    This is used as a fallback to read authentication tokens from the
+    acpctl CLI configuration when not specified in clusters.yaml.
+
+    Returns:
+        Path to ~/.config/acpctl/config.json
+    """
+    return Path.home() / ".config" / "acpctl" / "config.json"
+
+
 def load_settings() -> Settings:
     """Load and validate global settings.
 
