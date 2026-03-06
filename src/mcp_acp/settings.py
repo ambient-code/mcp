@@ -213,5 +213,10 @@ def load_clusters_config(settings: Settings | None = None) -> ClustersConfig:
     return ClustersConfig.from_yaml(settings.config_path)
 
 
+def _acpctl_config_path() -> Path:
+    """Return the path to the acpctl CLI configuration file."""
+    return Path.home() / ".config" / "ambient" / "config.json"
+
+
 # Global settings instance
 settings = load_settings()

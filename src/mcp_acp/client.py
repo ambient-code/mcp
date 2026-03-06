@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from mcp_acp.settings import _acpctl_config_path, load_clusters_config, load_settings
+from mcp_acp.tracing import trace_http_request
 from mcp_acp.utils.pylogger import get_python_logger
 
 logger = get_python_logger()
@@ -162,42 +163,44 @@ class ACPClient:
 
         client = await self._get_http_client()
 
-        try:
-            response = await client.request(
-                method=method,
-                url=url,
-                headers=headers,
-                json=json_data,
-                params=params,
-            )
-
-            if response.status_code >= 400:
-                try:
-                    error_data = response.json()
-                    error_msg = error_data.get("error", f"HTTP {response.status_code}")
-                except Exception:
-                    error_msg = f"HTTP {response.status_code}: {response.text}"
-
-                logger.warning(
-                    "api_request_failed",
+        async with trace_http_request(method, path, params) as span_ctx:
+            try:
+                response = await client.request(
                     method=method,
-                    path=path,
-                    status_code=response.status_code,
-                    error=error_msg,
+                    url=url,
+                    headers=headers,
+                    json=json_data,
+                    params=params,
                 )
-                raise ValueError(error_msg)
+                span_ctx.set_response(response.status_code)
 
-            if response.status_code == 204:
-                return {"success": True}
+                if response.status_code >= 400:
+                    try:
+                        error_data = response.json()
+                        error_msg = error_data.get("error", f"HTTP {response.status_code}")
+                    except Exception:
+                        error_msg = f"HTTP {response.status_code}: {response.text}"
 
-            return response.json()
+                    logger.warning(
+                        "api_request_failed",
+                        method=method,
+                        path=path,
+                        status_code=response.status_code,
+                        error=error_msg,
+                    )
+                    raise ValueError(error_msg)
 
-        except httpx.TimeoutException as e:
-            logger.error("api_request_timeout", method=method, path=path, error=str(e))
-            raise TimeoutError(f"Request timed out: {path}") from e
-        except httpx.RequestError as e:
-            logger.error("api_request_error", method=method, path=path, error=str(e))
-            raise ValueError(f"Request failed: {str(e)}") from e
+                if response.status_code == 204:
+                    return {"success": True}
+
+                return response.json()
+
+            except httpx.TimeoutException as e:
+                logger.error("api_request_timeout", method=method, path=path, error=str(e))
+                raise TimeoutError(f"Request timed out: {path}") from e
+            except httpx.RequestError as e:
+                logger.error("api_request_error", method=method, path=path, error=str(e))
+                raise ValueError(f"Request failed: {str(e)}") from e
 
     async def _request_text(
         self,
@@ -221,20 +224,22 @@ class ACPClient:
 
         client = await self._get_http_client()
 
-        try:
-            response = await client.request(method=method, url=url, headers=headers, params=params)
+        async with trace_http_request(method, path, params) as span_ctx:
+            try:
+                response = await client.request(method=method, url=url, headers=headers, params=params)
+                span_ctx.set_response(response.status_code)
 
-            if response.status_code >= 400:
-                raise ValueError(f"HTTP {response.status_code}: {response.text}")
+                if response.status_code >= 400:
+                    raise ValueError(f"HTTP {response.status_code}: {response.text}")
 
-            return response.text
+                return response.text
 
-        except httpx.TimeoutException as e:
-            logger.error("api_request_timeout", method=method, path=path, error=str(e))
-            raise TimeoutError(f"Request timed out: {path}") from e
-        except httpx.RequestError as e:
-            logger.error("api_request_error", method=method, path=path, error=str(e))
-            raise ValueError(f"Request failed: {str(e)}") from e
+            except httpx.TimeoutException as e:
+                logger.error("api_request_timeout", method=method, path=path, error=str(e))
+                raise TimeoutError(f"Request timed out: {path}") from e
+            except httpx.RequestError as e:
+                logger.error("api_request_error", method=method, path=path, error=str(e))
+                raise ValueError(f"Request failed: {str(e)}") from e
 
     # ── Validation ───────────────────────────────────────────────────────
 
@@ -544,6 +549,7 @@ class ACPClient:
         clone_data: dict[str, Any] = {
             "task": source.get("task", ""),
             "model": source.get("model", "claude-sonnet-4"),
+            "displayName": new_display_name,
         }
 
         if source.get("repos"):
