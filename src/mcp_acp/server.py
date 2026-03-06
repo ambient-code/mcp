@@ -8,7 +8,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from utils.pylogger import get_python_logger
+from mcp_acp.utils.pylogger import get_python_logger
 
 from .client import ACPClient
 from .formatters import (
