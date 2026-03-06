@@ -93,9 +93,7 @@ class MockHTTPClient:
         self.calls.append({"method": method, "url": url, "kwargs": kwargs})
 
         # Try to find a matching response (more specific paths first)
-        for (m, path), response in sorted(
-            self.responses.items(), key=lambda x: len(x[0][1]), reverse=True
-        ):
+        for (m, path), response in sorted(self.responses.items(), key=lambda x: len(x[0][1]), reverse=True):
             if method.upper() == m and path in url:
                 return response
 
@@ -108,11 +106,7 @@ class MockHTTPClient:
 
     def get_calls_for(self, method: str, path_contains: str = "") -> list[dict]:
         """Get all recorded calls matching method and optional path substring."""
-        return [
-            c
-            for c in self.calls
-            if c["method"].upper() == method.upper() and path_contains in c["url"]
-        ]
+        return [c for c in self.calls if c["method"].upper() == method.upper() and path_contains in c["url"]]
 
     def assert_called_with(self, method: str, path_contains: str):
         """Assert that at least one call was made with the given method and path."""
