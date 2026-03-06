@@ -286,12 +286,10 @@ class TestCreateSession:
         assert result["project"] == "test-project"
 
         manifest = result["manifest"]
-        assert manifest["initialPrompt"] == "Run all tests"
+        assert manifest["task"] == "Run all tests"
         assert manifest["displayName"] == "Test Run"
-        assert manifest["repos"] == ["https://github.com/org/repo"]
-        assert manifest["interactive"] is False
-        assert manifest["llmConfig"]["model"] == "claude-sonnet-4"
-        assert manifest["timeout"] == 900
+        assert manifest["repos"] == [{"url": "https://github.com/org/repo"}]
+        assert manifest["model"] == "claude-sonnet-4"
 
     @pytest.mark.asyncio
     async def test_create_session_dry_run_minimal(self, client: ACPClient) -> None:
@@ -349,19 +347,17 @@ class TestCreateSession:
             assert "invalid session spec" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_create_session_custom_model_and_timeout(self, client: ACPClient) -> None:
-        """Custom model and timeout should appear in dry-run manifest."""
+    async def test_create_session_custom_model(self, client: ACPClient) -> None:
+        """Custom model should appear in dry-run manifest."""
         result = await client.create_session(
             project="test-project",
             initial_prompt="hello",
             model="claude-opus-4",
-            timeout=3600,
             dry_run=True,
         )
 
         manifest = result["manifest"]
-        assert manifest["llmConfig"]["model"] == "claude-opus-4"
-        assert manifest["timeout"] == 3600
+        assert manifest["model"] == "claude-opus-4"
 
 
 class TestRestartSession:
@@ -460,11 +456,9 @@ class TestCloneSession:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "id": "source-1",
-            "initialPrompt": "original prompt",
-            "interactive": False,
-            "timeout": 900,
-            "llmConfig": {"model": "claude-sonnet-4"},
-            "repos": ["https://github.com/org/repo"],
+            "task": "original prompt",
+            "model": "claude-sonnet-4",
+            "repos": [{"url": "https://github.com/org/repo"}],
         }
 
         with patch.object(client, "_get_http_client") as mock_get_client:
@@ -478,6 +472,7 @@ class TestCloneSession:
             assert result["success"] is True
             assert "Would clone" in result["message"]
             assert result["manifest"]["displayName"] == "clone-name"
+            assert result["manifest"]["task"] == "original prompt"
             assert result["source_session"] == "source-1"
 
     @pytest.mark.asyncio
@@ -487,10 +482,8 @@ class TestCloneSession:
         source_response.status_code = 200
         source_response.json.return_value = {
             "id": "source-1",
-            "initialPrompt": "original prompt",
-            "interactive": False,
-            "timeout": 900,
-            "llmConfig": {"model": "claude-sonnet-4"},
+            "task": "original prompt",
+            "model": "claude-sonnet-4",
         }
 
         create_response = MagicMock()
@@ -588,8 +581,8 @@ class TestCreateSessionFromTemplate:
         assert "bugfix" in result["message"]
         manifest = result["manifest"]
         assert manifest["displayName"] == "Fix login bug"
-        assert manifest["workflow"] == "bugfix"
-        assert manifest["llmConfig"]["model"] == "claude-sonnet-4"
+        assert manifest["task"] == "Bugfix: diagnose and fix the reported bug."
+        assert manifest["model"] == "claude-sonnet-4"
 
     @pytest.mark.asyncio
     async def test_create_from_template_invalid_raises(self, client: ACPClient) -> None:

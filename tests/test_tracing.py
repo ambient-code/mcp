@@ -98,24 +98,24 @@ class TestGetLangfuse:
 
     def test_returns_none_on_init_error(self) -> None:
         """Returns None when Langfuse SDK raises during init."""
+        import mcp_acp.tracing as mod
+
+        # Reset module state
+        mod._langfuse_init_attempted = False
+        mod._langfuse_client = None
+
         env = {
             "MCP_ACP_TRACING_ENABLED": "true",
             "LANGFUSE_PUBLIC_KEY": "pk-test",
             "LANGFUSE_SECRET_KEY": "sk-test",
         }
+        # Create a mock langfuse module that raises on Langfuse()
+        mock_langfuse_module = MagicMock()
+        mock_langfuse_module.Langfuse = MagicMock(side_effect=RuntimeError("init failed"))
+
         with patch.dict(os.environ, env, clear=False):
-            with patch("mcp_acp.tracing.Langfuse", side_effect=RuntimeError("init failed"), create=True):
-                import mcp_acp.tracing as mod
-
-                # Directly patch the import path used inside get_langfuse
-                original = mod.get_langfuse
-
-                def patched_get():
-                    mod._langfuse_init_attempted = False
-                    mod._langfuse_client = None
-                    return original()
-
-                result = patched_get()
+            with patch.dict("sys.modules", {"langfuse": mock_langfuse_module}):
+                result = mod.get_langfuse()
                 # Should return None, not raise
                 assert result is None
 

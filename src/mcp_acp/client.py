@@ -549,6 +549,7 @@ class ACPClient:
         clone_data: dict[str, Any] = {
             "task": source.get("task", ""),
             "model": source.get("model", "claude-sonnet-4"),
+            "displayName": new_display_name,
         }
 
         if source.get("repos"):
