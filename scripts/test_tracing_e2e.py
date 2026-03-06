@@ -38,7 +38,7 @@ def setup_kind_config() -> Path:
 
     # Get node IP
     node_ip = subprocess.check_output(
-        ["kubectl", "get", "nodes", "-o", "jsonpath={.items[0].status.addresses[?(@.type==\"InternalIP\")].address}"],
+        ["kubectl", "get", "nodes", "-o", 'jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}'],
         text=True,
     ).strip()
 
@@ -78,7 +78,7 @@ def setup_kind_config() -> Path:
     config_path.write_text(config_content)
     print(f"Wrote clusters.yaml to {config_path}")
     print(f"  server: http://{node_ip}:{node_port}")
-    print(f"  project: ambient-code")
+    print("  project: ambient-code")
     return config_path
 
 
