@@ -4,14 +4,13 @@ This module tests the complete flow from tool call through the client to HTTP re
 mocking only the HTTP transport layer to verify the full integration.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 
 from mcp_acp.client import ACPClient
 from mcp_acp.server import call_tool, list_tools
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -206,9 +205,7 @@ class TestSessionManagementE2E:
         )
 
         with patch("mcp_acp.server.get_client", return_value=client_with_mock_http):
-            result = await call_tool(
-                "acp_list_sessions", {"project": "test-project", "status": "running", "limit": 10}
-            )
+            result = await call_tool("acp_list_sessions", {"project": "test-project", "status": "running", "limit": 10})
 
         assert len(result) == 1
         # Only running session should be shown after client-side filter
