@@ -680,8 +680,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
-async def main() -> None:
-    """Run the MCP server."""
+async def _run_stdio() -> None:
+    """Run the MCP server over stdio transport."""
     try:
         async with stdio_server() as (read_stream, write_stream):
             await app.run(
@@ -693,9 +693,55 @@ async def main() -> None:
         flush_tracing()
 
 
+def _run_http(host: str = "0.0.0.0", port: int = 8080) -> None:
+    """Run the MCP server over streamable-http transport."""
+    import contextlib
+
+    import uvicorn
+    from mcp.server.fastmcp.server import StreamableHTTPASGIApp
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    session_manager = StreamableHTTPSessionManager(app=app)
+    mcp_asgi = StreamableHTTPASGIApp(session_manager)
+
+    async def health(request: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok", "service": "mcp-acp"})
+
+    @contextlib.asynccontextmanager
+    async def lifespan(starlette_app):
+        async with session_manager.run():
+            yield
+
+    starlette_app = Starlette(
+        lifespan=lifespan,
+        routes=[
+            Route("/health", health, methods=["GET"]),
+            Route("/mcp", endpoint=mcp_asgi),
+        ],
+    )
+
+    logger.info("http_server_starting", host=host, port=port)
+    uvicorn.run(starlette_app, host=host, port=port, log_level="info")
+
+
 def run() -> None:
     """Entry point for the MCP server."""
-    asyncio.run(main())
+    import argparse
+
+    parser = argparse.ArgumentParser(description="MCP ACP Server")
+    parser.add_argument("--http", action="store_true", help="Use HTTP transport (default: stdio)")
+    parser.add_argument("--host", default="0.0.0.0", help="HTTP bind host (default: 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8080, help="HTTP port (default: 8080)")
+    args = parser.parse_args()
+
+    if args.http:
+        _run_http(host=args.host, port=args.port)
+    else:
+        asyncio.run(_run_stdio())
 
 
 if __name__ == "__main__":
