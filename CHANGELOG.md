@@ -1,6 +1,179 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-03-13)
+
+### Bug Fixes
+
+- Align MCP client with public API session contract
+  ([#35](https://github.com/ambient-code/mcp/pull/35),
+  [`051ee3b`](https://github.com/ambient-code/mcp/commit/051ee3b9f260fc5fa5e88f5a74b98349e149cfb7))
+
+The MCP client was sending field names that don't match the public API's CreateSessionRequest DTO,
+  causing session creation to fail with validation errors. Also removes parameters the public API
+  doesn't support.
+
+- client.py: initialPrompt → task, llmConfig.model → model - client.py: remove interactive/timeout
+  params (not in public API) - client.py: transform repos from bare strings to {url: str} objects -
+  client.py: fix clone_session to use same corrected field names - client.py: update
+  SESSION_TEMPLATES to use task/model fields - server.py: remove interactive/timeout from tool
+  schema and dispatch
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Move utils module into mcp_acp package for PyPI distribution
+  ([#38](https://github.com/ambient-code/mcp/pull/38),
+  [`adc3fb0`](https://github.com/ambient-code/mcp/commit/adc3fb0129b81bbe785ee98bb5048884ea53f726))
+
+The utils/pylogger module was at the repo root, outside the src/mcp_acp/ package. setuptools only
+  includes mcp_acp* from src/, so the utils module was missing from the PyPI wheel, causing
+  ImportError on install.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add HTTP transport support (--http flag) ([#40](https://github.com/ambient-code/mcp/pull/40),
+  [`8f1d3d0`](https://github.com/ambient-code/mcp/commit/8f1d3d0238ed49177571f224ceec4f4770c2367a))
+
+mcp-acp can now serve over streamable-http in addition to stdio:
+
+mcp-acp --http # HTTP on :8080 mcp-acp --http --port 9000 # custom port
+
+Uses StreamableHTTPSessionManager + StreamableHTTPASGIApp from the MCP SDK. Exposes /health for k8s
+  probes and /mcp for MCP protocol.
+
+Bumps mcp dependency to >=1.26 (required for streamable-http APIs). Adds uvicorn, starlette,
+  sse-starlette as dependencies. Version bump to 0.3.0.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add optional Langfuse tracing for MCP tool calls
+  ([#37](https://github.com/ambient-code/mcp/pull/37),
+  [`c0af6b0`](https://github.com/ambient-code/mcp/commit/c0af6b0f62ff3eb6ce773b13b45cfae9750d3ac0))
+
+* feat: add optional Langfuse tracing for MCP tool calls and HTTP requests
+
+Add observability to the mcp-acp server via Langfuse integration. Every MCP tool call produces a
+  trace with tool name, filtered args, duration, and success/error status. HTTP requests to the ACP
+  public API appear as nested child spans with method, path, and status code.
+
+Tracing is opt-in and silently no-ops when unconfigured: - Reads LANGFUSE_PUBLIC_KEY,
+  LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL - MCP_ACP_TRACING_ENABLED env var (default: true) serves as
+  kill switch - SDK init failures are caught and logged, never break tool execution
+
+- tracing.py: Langfuse v3 SDK client singleton, trace_tool_call and trace_http_request async context
+  managers, no-op fallbacks, lifecycle - server.py: wrap call_tool() dispatch in trace_tool_call,
+  flush on exit - client.py: wrap _request() and _request_text() in trace_http_request -
+  settings.py: add missing _acpctl_config_path() (pre-existing bug fix) - test_tracing.py: 25 unit
+  tests covering all tracing paths - scripts/test_tracing_e2e.py: e2e test against live ACP cluster
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+* test: add comprehensive E2E tests for MCP server
+
+Add test_server_e2e.py with full coverage of all 26 MCP tools: - Session management (list, get,
+  create, delete, restart, clone, update) - Observability (logs, transcript, metrics) - Labels (add,
+  remove, list by label, bulk operations) - Bulk operations (delete, stop, restart - by name and by
+  label) - Cluster management (list, whoami, switch, login)
+
+Tests use mocked HTTP transport to verify the complete flow from tool call through client to HTTP
+  requests. Includes: - Success and error path testing - Dry-run mode verification - Confirmation
+  requirement enforcement for destructive operations - Input validation testing - Complete workflow
+  simulation
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+* Fix ruff linting issues in test_tracing_e2e.py
+
+- Use single quotes for jsonpath argument containing double quotes - Remove unused f-string prefix
+
+* Fix ruff linting issues in test_server_e2e.py
+
+Remove unused AsyncMock import, extra blank line, and fix multi-line call formatting.
+
+* Fix import path for pylogger in tracing.py
+
+Use mcp_acp.utils.pylogger instead of utils.pylogger to match other modules in the package.
+
+* refactor: enhance E2E tests with better mocking and edge cases
+
+Improvements to MockHTTPClient: - Move to module level class with comprehensive docstrings - Add
+  get_calls_for() to retrieve calls matching method/path - Add assert_called_with() for HTTP call
+  verification - Sort responses by path length for better specificity matching
+
+New test cases: - test_create_session_with_repos: verify repos parameter handling -
+  test_invalid_template_name: validation for unknown templates - test_update_session_no_fields:
+  error when no update fields provided - test_bulk_by_label_no_matches: graceful empty results
+  handling - test_empty_sessions_list: empty list display - test_delete_verifies_http_call: HTTP
+  call verification example
+
+Other improvements: - Move json import to module level (remove local import) - Add detailed
+  docstrings with test categories
+
+* Fix test failures and implementation bug
+
+- Fix test_client.py: Update test expectations to match actual API schema (use 'task' instead of
+  'initialPrompt', 'model' instead of 'llmConfig.model') - Fix clone_session: Add displayName to
+  clone_data (was missing) - Fix test_tracing.py: Correct patch location for Langfuse module -
+  Remove non-existent 'timeout' parameter from create_session tests
+
+* Fix ruff formatting in test_server_e2e.py
+
+Combine multi-line statements that ruff prefers on single lines.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 <noreply@anthropic.com>
+
+Co-authored-by: Ambient Code Bot <bot@ambient-code.local>
+
+Co-authored-by: Jeremy Eder <jeder@redhat.com>
+
+### Testing
+
+- Add comprehensive E2E tests for MCP server ([#39](https://github.com/ambient-code/mcp/pull/39),
+  [`0bc57bf`](https://github.com/ambient-code/mcp/commit/0bc57bf3434d1780ce923fe790d404d491acff8b))
+
+* test: add comprehensive E2E tests for MCP server
+
+Add test_server_e2e.py with full coverage of all 26 MCP tools:
+
+Session Management: - list_sessions, get_session, create_session, create_session_from_template -
+  delete_session, restart_session, clone_session, update_session
+
+Observability: - get_session_logs, get_session_transcript, get_session_metrics
+
+Labels: - label_resource, unlabel_resource, list_sessions_by_label - bulk_label_resources,
+  bulk_unlabel_resources
+
+Bulk Operations: - bulk_delete_sessions, bulk_stop_sessions, bulk_restart_sessions -
+  bulk_delete_sessions_by_label, bulk_stop_sessions_by_label - bulk_restart_sessions_by_label
+
+Cluster Management: - list_clusters, whoami, switch_cluster, login
+
+Test Infrastructure: - MockHTTPClient class with response matching and call verification -
+  make_response helper for creating mock httpx responses - Fixtures for cluster config, settings,
+  and HTTP client
+
+Test Coverage Includes: - Success and error path testing - Dry-run mode verification - Confirmation
+  requirement enforcement for destructive operations - Input validation testing (invalid project,
+  template, etc.) - Complete session lifecycle workflow simulation - Edge cases (empty lists, no
+  matches, partial failures)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+* fix(ci): apply ruff formatting to test_server_e2e.py
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Ambient Code Bot <bot@ambient-code.local>
+
+Co-authored-by: Claude Opus 4.5 <noreply@anthropic.com>
+
+
 ## v0.2.2 (2026-02-16)
 
 ### Bug Fixes
@@ -17,6 +190,11 @@ Disable caching since uv is only used conditionally (via uvx for builds).
 Fixes: https://github.com/ambient-code/mcp/actions/runs/22051441188
 
 Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.2.2
+  ([`d510040`](https://github.com/ambient-code/mcp/commit/d510040ed4aebf48475c922ed8e05a2f8aa4d0a3))
 
 
 ## v0.2.1 (2026-02-16)
