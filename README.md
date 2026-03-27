@@ -27,7 +27,8 @@ A Model Context Protocol (MCP) server for managing Ambient Code Platform (ACP) s
 ```bash
 # Install
 git clone https://github.com/ambient-code/mcp
-pip install dist/mcp_acp-*.whl
+cd mcp
+pip install .    # installs the 'mcp-acp' command
 
 # Configure
 mkdir -p ~/.config/acp
@@ -113,23 +114,59 @@ List my ACP sessions
 
 ## Installation
 
-### From Wheel
-
-```bash
-pip install dist/mcp_acp-*.whl
-```
-
-### From Source
+### From Source (end users)
 
 ```bash
 git clone https://github.com/ambient-code/mcp
 cd mcp
+pip install .    # installs the 'mcp-acp' command
+```
+
+### From Wheel
+
+Requires `make` to be installed.
+
+```bash
+# "make install" sets up the dev environment (.venv + dependencies),
+# which "make build" then uses to produce the wheel in dist/
+make install
+make build
+pip install dist/mcp_acp-*.whl
+```
+
+### Development Install (contributors)
+
+```bash
+git clone https://github.com/ambient-code/mcp
+cd mcp
+uv venv
 uv pip install -e ".[dev]"
+```
+
+### Virtual Environment Install
+
+On some Linux distributions (Debian, Ubuntu, Fedora 38+), [PEP 668](https://peps.python.org/pep-0668/)
+prevents `pip install` into the system Python. If you get an "externally-managed-environment" error,
+install into a virtual environment instead:
+
+```bash
+git clone https://github.com/ambient-code/mcp
+cd mcp
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+```
+
+Note that the `mcp-acp` command will only be available inside the venv. To use it
+from an MCP client like Claude Code, reference the full path:
+
+```bash
+claude mcp add mcp-acp -t stdio /full/path/to/mcp/.venv/bin/mcp-acp
 ```
 
 **Requirements:**
 
-- Python 3.10+
+- Python 3.12+
 - Bearer token for the ACP public-api gateway
 - Access to an ACP cluster
 
@@ -233,7 +270,7 @@ For a local wheel (before PyPI publish):
   "mcpServers": {
     "acp": {
       "command": "uvx",
-      "args": ["--from", "/full/path/to/dist/mcp_acp-0.1.0-py3-none-any.whl", "mcp-acp"]
+      "args": ["--from", "/full/path/to/dist/mcp_acp-0.3.0-py3-none-any.whl", "mcp-acp"]
     }
   }
 }
