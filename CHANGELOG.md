@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-03-31)
+
+### Bug Fixes
+
+- Correct installation docs and add missing build dependency
+  ([`69f0e59`](https://github.com/ambient-code/mcp/commit/69f0e59bf7888ea075ca4bf12e8ada83045a1f37))
+
+The Quick Start referenced a pre-built wheel (dist/mcp_acp-*.whl) that doesn't exist after a fresh
+  clone, and the Python version requirement was listed as 3.10+ instead of the actual 3.12+.
+  Reorganized the Installation section to lead with the simplest path (pip install from source),
+  clarified audience for each install method, added a venv fallback for PEP 668 systems with
+  guidance on configuring MCP clients to use the venv path, and added the missing `build` package to
+  dev dependencies so `make build` succeeds.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+- Sync __init__.py version with pyproject.toml (0.3.0)
+  ([`3ba4e17`](https://github.com/ambient-code/mcp/commit/3ba4e17fd8ef1a518215ea2425c03b96c355e956))
+
+__init__.py was never updated when 0.3.0 was released in 95e83ee, leaving __version__ at "0.1.0".
+  Align it with pyproject.toml.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+
 ## v0.3.0 (2026-03-13)
 
 ### Bug Fixes
@@ -30,6 +55,11 @@ The utils/pylogger module was at the repo root, outside the src/mcp_acp/ package
   ImportError on install.
 
 Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.3.0
+  ([`95e83ee`](https://github.com/ambient-code/mcp/commit/95e83ee9997ac1314423fcea12f190ab68dece6d))
 
 ### Features
 
