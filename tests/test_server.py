@@ -27,6 +27,25 @@ class TestListTools:
         assert "acp_update_session" in tool_names
         assert "acp_stop_session" not in tool_names  # stop is via PATCH, no dedicated tool name
 
+        # Scheduled session tools
+        assert "acp_list_scheduled_sessions" in tool_names
+        assert "acp_get_scheduled_session" in tool_names
+        assert "acp_create_scheduled_session" in tool_names
+        assert "acp_update_scheduled_session" in tool_names
+        assert "acp_delete_scheduled_session" in tool_names
+        assert "acp_suspend_scheduled_session" in tool_names
+        assert "acp_resume_scheduled_session" in tool_names
+        assert "acp_trigger_scheduled_session" in tool_names
+        assert "acp_list_scheduled_session_runs" in tool_names
+
+        # Export, workflow, repo tools
+        assert "acp_export_session" in tool_names
+        assert "acp_set_workflow" in tool_names
+        assert "acp_get_workflow_metadata" in tool_names
+        assert "acp_add_repo" in tool_names
+        assert "acp_remove_repo" in tool_names
+        assert "acp_get_repos_status" in tool_names
+
         # Observability tools
         assert "acp_get_session_logs" in tool_names
         assert "acp_get_session_transcript" in tool_names
@@ -57,7 +76,7 @@ class TestListTools:
     async def test_list_tools_count(self) -> None:
         """Test correct number of tools."""
         tools = await list_tools()
-        assert len(tools) == 26
+        assert len(tools) == 41
 
 
 class TestCallTool:
@@ -800,3 +819,129 @@ class TestCallToolBulkByLabel:
 
             assert len(result) == 1
             assert "Successfully restarted 1" in result[0].text
+
+
+class TestCallToolScheduledSessions:
+    """Tests for scheduled session tool dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_list_scheduled_sessions_dispatch(self) -> None:
+        """Should dispatch to client.list_scheduled_sessions."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.list_scheduled_sessions = AsyncMock(
+            return_value={
+                "total": 1,
+                "scheduled_sessions": [
+                    {"name": "nightly-triage", "schedule": "0 2 * * *", "suspend": False, "activeCount": 0}
+                ],
+            }
+        )
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool("acp_list_scheduled_sessions", {"project": "test-project"})
+
+            assert len(result) == 1
+            assert "nightly-triage" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_create_scheduled_session_dispatch(self) -> None:
+        """Should dispatch to client.create_scheduled_session."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.create_scheduled_session = AsyncMock(
+            return_value={
+                "created": True,
+                "name": "nightly-triage",
+                "project": "test-project",
+                "message": "Scheduled session 'nightly-triage' created",
+            }
+        )
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_create_scheduled_session",
+                {"project": "test-project", "schedule": "0 2 * * *", "session_template": {"task": "Nightly triage"}},
+            )
+
+            assert len(result) == 1
+            assert "nightly-triage" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_trigger_scheduled_session_dispatch(self) -> None:
+        """Should dispatch to client.trigger_scheduled_session."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.trigger_scheduled_session = AsyncMock(
+            return_value={"triggered": True, "message": "Scheduled session 'nightly-triage' triggered"}
+        )
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_trigger_scheduled_session",
+                {"project": "test-project", "name": "nightly-triage"},
+            )
+
+            assert len(result) == 1
+            assert "triggered" in result[0].text.lower()
+
+
+class TestCallToolExportWorkflowRepo:
+    """Tests for export, workflow, and repo tool dispatch."""
+
+    @pytest.mark.asyncio
+    async def test_export_session_dispatch(self) -> None:
+        """Should dispatch to client.export_session."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.export_session = AsyncMock(
+            return_value={"export": "# Session Export\n\nhello", "session": "session-1"}
+        )
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool("acp_export_session", {"project": "test-project", "session": "session-1"})
+
+            assert len(result) == 1
+            assert "Session Export" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_set_workflow_dispatch(self) -> None:
+        """Should dispatch to client.set_workflow."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.set_workflow = AsyncMock(return_value={"success": True, "message": "Workflow set to triage"})
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_set_workflow",
+                {"project": "test-project", "session": "session-1", "workflow": "triage"},
+            )
+
+            assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_add_repo_dispatch(self) -> None:
+        """Should dispatch to client.add_repo."""
+        mock_client = MagicMock()
+        mock_client.clusters_config = MagicMock()
+        mock_client.clusters_config.default_cluster = "test"
+        mock_client.clusters_config.clusters = {"test": MagicMock(default_project="test-project")}
+        mock_client.add_repo = AsyncMock(return_value={"success": True, "message": "Repo added"})
+
+        with patch("mcp_acp.server.get_client", return_value=mock_client):
+            result = await call_tool(
+                "acp_add_repo",
+                {"project": "test-project", "session": "session-1", "repo_url": "https://github.com/org/repo"},
+            )
+
+            assert len(result) == 1

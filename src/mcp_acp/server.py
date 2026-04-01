@@ -19,6 +19,9 @@ from .formatters import (
     format_logs,
     format_metrics,
     format_result,
+    format_scheduled_session_created,
+    format_scheduled_session_runs,
+    format_scheduled_sessions_list,
     format_session_created,
     format_sessions_list,
     format_transcript,
@@ -65,6 +68,23 @@ _LABELS_OBJECT = {
     "description": 'Labels as key-value pairs (e.g., {"env": "test", "team": "qa"})',
 }
 _LABEL_KEYS_ARRAY = {"type": "array", "items": {"type": "string"}, "description": "List of label keys to remove"}
+_SCHEDULED_SESSION_NAME = {"type": "string", "description": "Scheduled session name"}
+_SCHEDULE = {"type": "string", "description": "Cron expression (e.g., '0 2 * * *' for nightly at 2am)"}
+_SESSION_TEMPLATE = {
+    "type": "object",
+    "description": "Session template (same as create_session: task, model, repos, displayName, etc.)",
+    "properties": {
+        "task": {"type": "string", "description": "The prompt/instructions"},
+        "model": {"type": "string", "description": "LLM model", "default": "claude-sonnet-4"},
+        "repos": {
+            "type": "array",
+            "items": {"type": "object", "properties": {"url": {"type": "string"}}},
+            "description": "Repositories to clone",
+        },
+        "displayName": {"type": "string", "description": "Display name for created sessions"},
+    },
+    "required": ["task"],
+}
 
 
 @app.list_tools()
@@ -412,6 +432,172 @@ async def list_tools() -> list[Tool]:
                 "required": ["cluster"],
             },
         ),
+        # ── Scheduled Sessions ──────────────────────────────────────────
+        Tool(
+            name="acp_list_scheduled_sessions",
+            description="List all scheduled sessions (cron-based recurring sessions) in a project.",
+            inputSchema={"type": "object", "properties": {"project": _PROJECT}, "required": []},
+        ),
+        Tool(
+            name="acp_get_scheduled_session",
+            description="Get details of a specific scheduled session by name.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "name": _SCHEDULED_SESSION_NAME},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="acp_create_scheduled_session",
+            description="Create a scheduled session backed by a Kubernetes CronJob. Requires a cron schedule and a session template.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": _PROJECT,
+                    "schedule": _SCHEDULE,
+                    "session_template": _SESSION_TEMPLATE,
+                    "display_name": {"type": "string", "description": "Human-readable name for this schedule"},
+                    "suspend": {
+                        "type": "boolean",
+                        "description": "Create in suspended state (default: false)",
+                        "default": False,
+                    },
+                    "dry_run": _DRY_RUN,
+                },
+                "required": ["schedule", "session_template"],
+            },
+        ),
+        Tool(
+            name="acp_update_scheduled_session",
+            description="Update a scheduled session (schedule, template, display name, or suspend state).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": _PROJECT,
+                    "name": _SCHEDULED_SESSION_NAME,
+                    "schedule": _SCHEDULE,
+                    "display_name": {"type": "string", "description": "New display name"},
+                    "session_template": _SESSION_TEMPLATE,
+                    "suspend": {"type": "boolean", "description": "Suspend or unsuspend"},
+                    "dry_run": _DRY_RUN,
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="acp_delete_scheduled_session",
+            description="Delete a scheduled session and its CronJob. Supports dry-run mode.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "name": _SCHEDULED_SESSION_NAME, "dry_run": _DRY_RUN},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="acp_suspend_scheduled_session",
+            description="Suspend (pause) a scheduled session. The CronJob will stop creating new sessions.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "name": _SCHEDULED_SESSION_NAME},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="acp_resume_scheduled_session",
+            description="Resume a suspended scheduled session. The CronJob will start creating sessions again.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "name": _SCHEDULED_SESSION_NAME},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="acp_trigger_scheduled_session",
+            description="Manually trigger a scheduled session to run immediately, regardless of its cron schedule.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "name": _SCHEDULED_SESSION_NAME},
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="acp_list_scheduled_session_runs",
+            description="List past runs (AgenticSessions) created by a scheduled session.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "name": _SCHEDULED_SESSION_NAME},
+                "required": ["name"],
+            },
+        ),
+        # ── Session Export ──────────────────────────────────────────────
+        Tool(
+            name="acp_export_session",
+            description="Export session chat history as markdown.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "session": _SESSION},
+                "required": ["session"],
+            },
+        ),
+        # ── Workflow Management ─────────────────────────────────────────
+        Tool(
+            name="acp_set_workflow",
+            description="Set the active workflow on a running session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": _PROJECT,
+                    "session": _SESSION,
+                    "workflow": {"type": "string", "description": "Workflow name to activate"},
+                },
+                "required": ["session", "workflow"],
+            },
+        ),
+        Tool(
+            name="acp_get_workflow_metadata",
+            description="Get workflow metadata (steps, configuration) for a session.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "session": _SESSION},
+                "required": ["session"],
+            },
+        ),
+        # ── Repo Management ─────────────────────────────────────────────
+        Tool(
+            name="acp_add_repo",
+            description="Add a repository to a running session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": _PROJECT,
+                    "session": _SESSION,
+                    "repo_url": {"type": "string", "description": "Repository URL to clone"},
+                },
+                "required": ["session", "repo_url"],
+            },
+        ),
+        Tool(
+            name="acp_remove_repo",
+            description="Remove a repository from a session.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": _PROJECT,
+                    "session": _SESSION,
+                    "repo_name": {"type": "string", "description": "Repository name to remove"},
+                },
+                "required": ["session", "repo_name"],
+            },
+        ),
+        Tool(
+            name="acp_get_repos_status",
+            description="Check repository clone status for a session.",
+            inputSchema={
+                "type": "object",
+                "properties": {"project": _PROJECT, "session": _SESSION},
+                "required": ["session"],
+            },
+        ),
     ]
 
 
@@ -650,6 +836,93 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             elif name == "acp_login":
                 result = await client.login(cluster=arguments["cluster"], token=arguments.get("token"))
                 text = format_login(result)
+
+            # Scheduled sessions
+            elif name == "acp_list_scheduled_sessions":
+                result = await client.list_scheduled_sessions(project=project)
+                text = format_scheduled_sessions_list(result)
+
+            elif name == "acp_get_scheduled_session":
+                result = await client.get_scheduled_session(project=project, name=arguments["name"])
+                text = format_result(result)
+
+            elif name == "acp_create_scheduled_session":
+                result = await client.create_scheduled_session(
+                    project=project,
+                    schedule=arguments["schedule"],
+                    session_template=arguments["session_template"],
+                    display_name=arguments.get("display_name"),
+                    suspend=arguments.get("suspend", False),
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_scheduled_session_created(result)
+
+            elif name == "acp_update_scheduled_session":
+                result = await client.update_scheduled_session(
+                    project=project,
+                    name=arguments["name"],
+                    schedule=arguments.get("schedule"),
+                    display_name=arguments.get("display_name"),
+                    session_template=arguments.get("session_template"),
+                    suspend=arguments.get("suspend"),
+                    dry_run=arguments.get("dry_run", False),
+                )
+                text = format_result(result)
+
+            elif name == "acp_delete_scheduled_session":
+                result = await client.delete_scheduled_session(
+                    project=project, name=arguments["name"], dry_run=arguments.get("dry_run", False)
+                )
+                text = format_result(result)
+
+            elif name == "acp_suspend_scheduled_session":
+                result = await client.suspend_scheduled_session(project=project, name=arguments["name"])
+                text = format_result(result)
+
+            elif name == "acp_resume_scheduled_session":
+                result = await client.resume_scheduled_session(project=project, name=arguments["name"])
+                text = format_result(result)
+
+            elif name == "acp_trigger_scheduled_session":
+                result = await client.trigger_scheduled_session(project=project, name=arguments["name"])
+                text = format_result(result)
+
+            elif name == "acp_list_scheduled_session_runs":
+                result = await client.list_scheduled_session_runs(project=project, name=arguments["name"])
+                text = format_scheduled_session_runs(result)
+
+            # Session export
+            elif name == "acp_export_session":
+                result = await client.export_session(project=project, session=arguments["session"])
+                text = result["export"]
+
+            # Workflow management
+            elif name == "acp_set_workflow":
+                result = await client.set_workflow(
+                    project=project, session=arguments["session"], workflow=arguments["workflow"]
+                )
+                text = format_result(result)
+
+            elif name == "acp_get_workflow_metadata":
+                result = await client.get_workflow_metadata(project=project, session=arguments["session"])
+                text = format_result(result)
+
+            # Repo management
+            elif name == "acp_add_repo":
+                result = await client.add_repo(
+                    project=project, session=arguments["session"], repo_url=arguments["repo_url"]
+                )
+                text = format_result(result)
+
+            elif name == "acp_remove_repo":
+                result = await client.remove_repo(
+                    project=project, session=arguments["session"], repo_name=arguments["repo_name"]
+                )
+                text = format_result(result)
+
+            elif name == "acp_get_repos_status":
+                result = await client.get_repos_status(project=project, session=arguments["session"])
+                text = format_result(result)
 
             else:
                 logger.warning("unknown_tool_requested", tool=name)

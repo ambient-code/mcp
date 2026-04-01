@@ -138,9 +138,9 @@ class TestListToolsE2E:
 
     @pytest.mark.asyncio
     async def test_all_tools_registered(self):
-        """All 26 tools should be available."""
+        """All 41 tools should be available."""
         tools = await list_tools()
-        assert len(tools) == 26
+        assert len(tools) == 41
 
         tool_names = {t.name for t in tools}
         expected_tools = {
@@ -175,6 +175,25 @@ class TestListToolsE2E:
             "acp_whoami",
             "acp_switch_cluster",
             "acp_login",
+            # Scheduled sessions
+            "acp_list_scheduled_sessions",
+            "acp_get_scheduled_session",
+            "acp_create_scheduled_session",
+            "acp_update_scheduled_session",
+            "acp_delete_scheduled_session",
+            "acp_suspend_scheduled_session",
+            "acp_resume_scheduled_session",
+            "acp_trigger_scheduled_session",
+            "acp_list_scheduled_session_runs",
+            # Session export
+            "acp_export_session",
+            # Workflow management
+            "acp_set_workflow",
+            "acp_get_workflow_metadata",
+            # Repo management
+            "acp_add_repo",
+            "acp_remove_repo",
+            "acp_get_repos_status",
         }
         assert tool_names == expected_tools
 

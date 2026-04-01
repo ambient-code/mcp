@@ -84,7 +84,7 @@ uv run python -m mcp_acp.server
 ### Three-Layer Design
 
 **1. MCP Server Layer (`server.py`)**
-- Exposes 26 MCP tools via stdio protocol
+- Exposes 41 MCP tools via stdio protocol
 - Inline JSON Schema definitions per tool
 - if/elif dispatch in `call_tool()` maps tool names to handlers
 - Server-layer confirmation enforcement for destructive bulk operations

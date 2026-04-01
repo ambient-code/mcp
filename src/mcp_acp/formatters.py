@@ -272,3 +272,59 @@ def format_login(result: dict[str, Any]) -> str:
         output += f"Error: {result.get('message', 'unknown error')}\n"
 
     return output
+
+
+def format_scheduled_sessions_list(result: dict[str, Any]) -> str:
+    """Format scheduled sessions list."""
+    output = f"Found {result['total']} scheduled session(s)\n\n"
+
+    for ss in result["scheduled_sessions"]:
+        name = ss.get("name", "unknown")
+        schedule = ss.get("schedule", "unknown")
+        suspended = ss.get("suspend", False)
+        active = ss.get("activeCount", 0)
+        display = ss.get("displayName", "")
+
+        output += f"- {name}"
+        if display:
+            output += f" ({display})"
+        output += f"\n  Schedule: {schedule}"
+        output += f"\n  Suspended: {suspended}"
+        output += f"\n  Active runs: {active}\n"
+
+    return output
+
+
+def format_scheduled_session_created(result: dict[str, Any]) -> str:
+    """Format scheduled session creation result."""
+    if result.get("dry_run"):
+        output = "DRY RUN MODE - No changes made\n\n"
+        output += result.get("message", "")
+        if "manifest" in result:
+            output += f"\n\nManifest:\n{json.dumps(result['manifest'], indent=2)}"
+        return output
+
+    if not result.get("created"):
+        return f"Failed to create scheduled session: {result.get('message', 'unknown error')}"
+
+    name = result.get("name", "unknown")
+    output = f"Scheduled session created: {name}\n"
+    output += result.get("message", "")
+    return output
+
+
+def format_scheduled_session_runs(result: dict[str, Any]) -> str:
+    """Format list of past runs for a scheduled session."""
+    ss_name = result.get("scheduled_session", "unknown")
+    output = f"Runs for scheduled session '{ss_name}': {result['total']} total\n\n"
+
+    for run in result["runs"]:
+        run_id = run.get("id", run.get("name", "unknown"))
+        status = run.get("status", "unknown")
+        created = run.get("createdAt", run.get("creationTimestamp", "unknown"))
+
+        output += f"- {run_id}\n"
+        output += f"  Status: {status}\n"
+        output += f"  Created: {created}\n"
+
+    return output
