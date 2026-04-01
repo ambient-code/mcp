@@ -8,6 +8,9 @@ from mcp_acp.formatters import (
     format_logs,
     format_metrics,
     format_result,
+    format_scheduled_session_created,
+    format_scheduled_session_runs,
+    format_scheduled_sessions_list,
     format_session_created,
     format_sessions_list,
     format_transcript,
@@ -425,3 +428,95 @@ class TestFormatSessionCreated:
 
         assert "Failed to create session" in output
         assert "Invalid spec" in output
+
+
+class TestFormatScheduledSessionsList:
+    """Tests for format_scheduled_sessions_list."""
+
+    def test_format_scheduled_sessions_list(self) -> None:
+        """Test formatting scheduled sessions list."""
+        result = {
+            "total": 1,
+            "scheduled_sessions": [
+                {
+                    "name": "nightly-triage",
+                    "schedule": "0 2 * * *",
+                    "suspend": False,
+                    "activeCount": 1,
+                    "displayName": "Nightly Triage",
+                }
+            ],
+        }
+
+        output = format_scheduled_sessions_list(result)
+
+        assert "Found 1 scheduled session(s)" in output
+        assert "nightly-triage" in output
+        assert "0 2 * * *" in output
+        assert "Nightly Triage" in output
+
+    def test_format_scheduled_sessions_list_empty(self) -> None:
+        """Test formatting empty scheduled sessions list."""
+        result = {"total": 0, "scheduled_sessions": []}
+
+        output = format_scheduled_sessions_list(result)
+
+        assert "Found 0 scheduled session(s)" in output
+
+
+class TestFormatScheduledSessionCreated:
+    """Tests for format_scheduled_session_created."""
+
+    def test_format_created(self) -> None:
+        """Test formatting successful creation."""
+        result = {
+            "created": True,
+            "name": "nightly-triage",
+            "message": "Scheduled session 'nightly-triage' created with schedule '0 2 * * *'",
+        }
+
+        output = format_scheduled_session_created(result)
+
+        assert "Scheduled session created: nightly-triage" in output
+
+    def test_format_created_dry_run(self) -> None:
+        """Test formatting dry run creation."""
+        result = {
+            "dry_run": True,
+            "message": "Would create scheduled session",
+            "manifest": {"schedule": "0 2 * * *"},
+        }
+
+        output = format_scheduled_session_created(result)
+
+        assert "DRY RUN MODE" in output
+
+    def test_format_created_failure(self) -> None:
+        """Test formatting creation failure."""
+        result = {"created": False, "message": "Invalid schedule"}
+
+        output = format_scheduled_session_created(result)
+
+        assert "Failed to create scheduled session" in output
+
+
+class TestFormatScheduledSessionRuns:
+    """Tests for format_scheduled_session_runs."""
+
+    def test_format_runs(self) -> None:
+        """Test formatting runs list."""
+        result = {
+            "scheduled_session": "nightly-triage",
+            "total": 2,
+            "runs": [
+                {"id": "run-1", "status": "completed", "createdAt": "2026-03-12T02:00:00Z"},
+                {"id": "run-2", "status": "running", "createdAt": "2026-03-13T02:00:00Z"},
+            ],
+        }
+
+        output = format_scheduled_session_runs(result)
+
+        assert "nightly-triage" in output
+        assert "2 total" in output
+        assert "run-1" in output
+        assert "completed" in output

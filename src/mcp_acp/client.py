@@ -622,6 +622,163 @@ class ACPClient:
         except ValueError as e:
             return {"updated": False, "message": f"Failed to update session: {str(e)}"}
 
+    # ── Scheduled Sessions ──────────────────────────────────────────────
+
+    async def list_scheduled_sessions(self, project: str) -> dict[str, Any]:
+        """List all scheduled sessions."""
+        self._validate_input(project, "project")
+        response = await self._request("GET", "/v1/scheduled-sessions", project)
+        items = response.get("items", [])
+        return {"scheduled_sessions": items, "total": len(items)}
+
+    async def get_scheduled_session(self, project: str, name: str) -> dict[str, Any]:
+        """Get a specific scheduled session by name."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+        return await self._request("GET", f"/v1/scheduled-sessions/{name}", project)
+
+    async def create_scheduled_session(
+        self,
+        project: str,
+        schedule: str,
+        session_template: dict[str, Any],
+        display_name: str | None = None,
+        suspend: bool = False,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Create a scheduled session backed by a Kubernetes CronJob."""
+        self._validate_input(project, "project")
+
+        payload: dict[str, Any] = {
+            "schedule": schedule,
+            "sessionTemplate": session_template,
+            "suspend": suspend,
+        }
+        if display_name:
+            payload["displayName"] = display_name
+
+        if dry_run:
+            return {
+                "dry_run": True,
+                "success": True,
+                "message": f"Would create scheduled session with schedule '{schedule}'",
+                "manifest": payload,
+                "project": project,
+            }
+
+        try:
+            result = await self._request("POST", "/v1/scheduled-sessions", project, json_data=payload)
+            name = result.get("name", "unknown")
+            return {
+                "created": True,
+                "name": name,
+                "project": project,
+                "message": f"Scheduled session '{name}' created with schedule '{schedule}'",
+            }
+        except (ValueError, TimeoutError) as e:
+            return {"created": False, "message": str(e)}
+
+    async def update_scheduled_session(
+        self,
+        project: str,
+        name: str,
+        schedule: str | None = None,
+        display_name: str | None = None,
+        session_template: dict[str, Any] | None = None,
+        suspend: bool | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Update a scheduled session (partial update)."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+
+        payload: dict[str, Any] = {}
+        if schedule is not None:
+            payload["schedule"] = schedule
+        if display_name is not None:
+            payload["displayName"] = display_name
+        if session_template is not None:
+            payload["sessionTemplate"] = session_template
+        if suspend is not None:
+            payload["suspend"] = suspend
+
+        if not payload:
+            raise ValueError("No fields to update. Provide schedule, display_name, session_template, or suspend.")
+
+        if dry_run:
+            return {
+                "dry_run": True,
+                "success": True,
+                "message": f"Would update scheduled session '{name}'",
+                "patch": payload,
+            }
+
+        try:
+            await self._request("PUT", f"/v1/scheduled-sessions/{name}", project, json_data=payload)
+            return {"updated": True, "message": f"Successfully updated scheduled session '{name}'"}
+        except ValueError as e:
+            return {"updated": False, "message": f"Failed to update: {str(e)}"}
+
+    async def delete_scheduled_session(self, project: str, name: str, dry_run: bool = False) -> dict[str, Any]:
+        """Delete a scheduled session."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+
+        if dry_run:
+            try:
+                data = await self._request("GET", f"/v1/scheduled-sessions/{name}", project)
+                return {
+                    "dry_run": True,
+                    "success": True,
+                    "message": f"Would delete scheduled session '{name}'",
+                    "session_info": {
+                        "name": data.get("name"),
+                        "schedule": data.get("schedule"),
+                        "suspend": data.get("suspend"),
+                    },
+                }
+            except ValueError:
+                return {"dry_run": True, "success": False, "message": f"Scheduled session '{name}' not found"}
+
+        try:
+            await self._request("DELETE", f"/v1/scheduled-sessions/{name}", project)
+            return {"deleted": True, "message": f"Successfully deleted scheduled session '{name}'"}
+        except ValueError as e:
+            return {"deleted": False, "message": f"Failed to delete: {str(e)}"}
+
+    async def suspend_scheduled_session(self, project: str, name: str) -> dict[str, Any]:
+        """Suspend (pause) a scheduled session."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+
+        await self._request("POST", f"/v1/scheduled-sessions/{name}/suspend", project)
+        return {"suspended": True, "message": f"Scheduled session '{name}' suspended"}
+
+    async def resume_scheduled_session(self, project: str, name: str) -> dict[str, Any]:
+        """Resume a suspended scheduled session."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+
+        await self._request("POST", f"/v1/scheduled-sessions/{name}/resume", project)
+        return {"resumed": True, "message": f"Scheduled session '{name}' resumed"}
+
+    async def trigger_scheduled_session(self, project: str, name: str) -> dict[str, Any]:
+        """Manually trigger a scheduled session to run immediately."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+
+        await self._request("POST", f"/v1/scheduled-sessions/{name}/trigger", project)
+        return {"triggered": True, "message": f"Scheduled session '{name}' triggered"}
+
+    async def list_scheduled_session_runs(self, project: str, name: str) -> dict[str, Any]:
+        """List past runs (AgenticSessions) created by a scheduled session."""
+        self._validate_input(project, "project")
+        self._validate_input(name, "name")
+
+        response = await self._request("GET", f"/v1/scheduled-sessions/{name}/runs", project)
+        items = response.get("items", [])
+        return {"runs": items, "total": len(items), "scheduled_session": name}
+
     # ── Observability ────────────────────────────────────────────────────
 
     async def get_session_logs(
@@ -675,6 +832,14 @@ class ACPClient:
         result = await self._request("GET", f"/v1/sessions/{session}/metrics", project)
         result["session"] = session
         return result
+
+    async def export_session(self, project: str, session: str) -> dict[str, Any]:
+        """Export session chat as markdown."""
+        self._validate_input(project, "project")
+        self._validate_input(session, "session")
+
+        text = await self._request_text("GET", f"/v1/sessions/{session}/export", project)
+        return {"export": text, "session": session}
 
     # ── Labels ───────────────────────────────────────────────────────────
 
@@ -873,6 +1038,53 @@ class ACPClient:
     ) -> dict[str, Any]:
         """Restart sessions matching label selectors (max 3 matches)."""
         return await self._run_bulk_by_label(project, labels, self.restart_session, "restart", "restarted", dry_run)
+
+    # ── Workflow Management ─────────────────────────────────────────────
+
+    async def set_workflow(self, project: str, session: str, workflow: str) -> dict[str, Any]:
+        """Set the active workflow on a session."""
+        self._validate_input(project, "project")
+        self._validate_input(session, "session")
+
+        return await self._request(
+            "POST", f"/v1/sessions/{session}/workflow", project, json_data={"workflow": workflow}
+        )
+
+    async def get_workflow_metadata(self, project: str, session: str) -> dict[str, Any]:
+        """Get workflow metadata for a session."""
+        self._validate_input(project, "project")
+        self._validate_input(session, "session")
+
+        result = await self._request("GET", f"/v1/sessions/{session}/workflow/metadata", project)
+        result["session"] = session
+        return result
+
+    # ── Repo Management ─────────────────────────────────────────────────
+
+    async def add_repo(self, project: str, session: str, repo_url: str) -> dict[str, Any]:
+        """Add a repository to a running session."""
+        self._validate_input(project, "project")
+        self._validate_input(session, "session")
+
+        return await self._request("POST", f"/v1/sessions/{session}/repos", project, json_data={"url": repo_url})
+
+    async def remove_repo(self, project: str, session: str, repo_name: str) -> dict[str, Any]:
+        """Remove a repository from a session."""
+        self._validate_input(project, "project")
+        self._validate_input(session, "session")
+        self._validate_input(repo_name, "repo_name")
+
+        await self._request("DELETE", f"/v1/sessions/{session}/repos/{repo_name}", project)
+        return {"removed": True, "message": f"Repo '{repo_name}' removed from session '{session}'"}
+
+    async def get_repos_status(self, project: str, session: str) -> dict[str, Any]:
+        """Get repository clone status for a session."""
+        self._validate_input(project, "project")
+        self._validate_input(session, "session")
+
+        result = await self._request("GET", f"/v1/sessions/{session}/repos/status", project)
+        result["session"] = session
+        return result
 
     # ── Cluster & auth ───────────────────────────────────────────────────
 

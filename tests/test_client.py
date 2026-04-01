@@ -1066,3 +1066,317 @@ class TestLogin:
 
         assert result["authenticated"] is False
         assert "Unknown cluster" in result["message"]
+
+
+class TestScheduledSessions:
+    """Tests for scheduled session operations."""
+
+    @pytest.mark.asyncio
+    async def test_list_scheduled_sessions(self, client: ACPClient) -> None:
+        """Test listing scheduled sessions."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "items": [{"name": "nightly-triage", "schedule": "0 2 * * *", "suspend": False}]
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.list_scheduled_sessions("test-project")
+
+            assert result["total"] == 1
+            assert result["scheduled_sessions"][0]["name"] == "nightly-triage"
+
+    @pytest.mark.asyncio
+    async def test_get_scheduled_session(self, client: ACPClient) -> None:
+        """Test getting a specific scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "name": "nightly-triage",
+            "schedule": "0 2 * * *",
+            "suspend": False,
+            "activeCount": 0,
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.get_scheduled_session("test-project", "nightly-triage")
+
+            assert result["name"] == "nightly-triage"
+            assert result["schedule"] == "0 2 * * *"
+
+    @pytest.mark.asyncio
+    async def test_create_scheduled_session(self, client: ACPClient) -> None:
+        """Test creating a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"name": "nightly-triage"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.create_scheduled_session(
+                project="test-project",
+                schedule="0 2 * * *",
+                session_template={"task": "Nightly triage", "model": "claude-sonnet-4"},
+                display_name="Nightly Triage",
+            )
+
+            assert result["created"] is True
+            assert result["name"] == "nightly-triage"
+
+    @pytest.mark.asyncio
+    async def test_create_scheduled_session_dry_run(self, client: ACPClient) -> None:
+        """Test creating a scheduled session in dry-run mode."""
+        result = await client.create_scheduled_session(
+            project="test-project",
+            schedule="0 2 * * *",
+            session_template={"task": "Nightly triage", "model": "claude-sonnet-4"},
+            display_name="Nightly Triage",
+            dry_run=True,
+        )
+
+        assert result["dry_run"] is True
+        assert result["manifest"]["schedule"] == "0 2 * * *"
+
+    @pytest.mark.asyncio
+    async def test_update_scheduled_session(self, client: ACPClient) -> None:
+        """Test updating a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"name": "nightly-triage", "schedule": "0 3 * * *"}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.update_scheduled_session(
+                project="test-project",
+                name="nightly-triage",
+                schedule="0 3 * * *",
+            )
+
+            assert result["updated"] is True
+
+    @pytest.mark.asyncio
+    async def test_delete_scheduled_session(self, client: ACPClient) -> None:
+        """Test deleting a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.delete_scheduled_session("test-project", "nightly-triage")
+
+            assert result["deleted"] is True
+
+    @pytest.mark.asyncio
+    async def test_delete_scheduled_session_dry_run(self, client: ACPClient) -> None:
+        """Test deleting a scheduled session in dry-run mode."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "name": "nightly-triage",
+            "schedule": "0 2 * * *",
+            "suspend": False,
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.delete_scheduled_session("test-project", "nightly-triage", dry_run=True)
+
+            assert result["dry_run"] is True
+            assert result["session_info"]["name"] == "nightly-triage"
+
+    @pytest.mark.asyncio
+    async def test_suspend_scheduled_session(self, client: ACPClient) -> None:
+        """Test suspending a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.suspend_scheduled_session("test-project", "nightly-triage")
+
+            assert result["suspended"] is True
+
+    @pytest.mark.asyncio
+    async def test_resume_scheduled_session(self, client: ACPClient) -> None:
+        """Test resuming a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.resume_scheduled_session("test-project", "nightly-triage")
+
+            assert result["resumed"] is True
+
+    @pytest.mark.asyncio
+    async def test_trigger_scheduled_session(self, client: ACPClient) -> None:
+        """Test manually triggering a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.trigger_scheduled_session("test-project", "nightly-triage")
+
+            assert result["triggered"] is True
+
+    @pytest.mark.asyncio
+    async def test_list_scheduled_session_runs(self, client: ACPClient) -> None:
+        """Test listing past runs of a scheduled session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"items": [{"id": "run-1", "status": "completed"}]}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.list_scheduled_session_runs("test-project", "nightly-triage")
+
+            assert result["total"] == 1
+            assert result["runs"][0]["id"] == "run-1"
+
+
+class TestSessionExport:
+    """Tests for session export."""
+
+    @pytest.mark.asyncio
+    async def test_export_session(self, client: ACPClient) -> None:
+        """Test exporting session chat as markdown."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "# Session Export\n\n## Messages\n..."
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.export_session("test-project", "session-1")
+
+            assert result["export"] == "# Session Export\n\n## Messages\n..."
+            assert result["session"] == "session-1"
+
+
+class TestWorkflowManagement:
+    """Tests for workflow management."""
+
+    @pytest.mark.asyncio
+    async def test_set_workflow(self, client: ACPClient) -> None:
+        """Test setting active workflow on a session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.set_workflow("test-project", "session-1", "triage")
+
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_metadata(self, client: ACPClient) -> None:
+        """Test getting workflow metadata."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"workflow": "triage", "steps": ["investigate", "classify"]}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.get_workflow_metadata("test-project", "session-1")
+
+            assert result["workflow"] == "triage"
+
+
+class TestRepoManagement:
+    """Tests for repo management on running sessions."""
+
+    @pytest.mark.asyncio
+    async def test_add_repo(self, client: ACPClient) -> None:
+        """Test adding a repo to a running session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.add_repo("test-project", "session-1", "https://github.com/org/repo")
+
+            assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_remove_repo(self, client: ACPClient) -> None:
+        """Test removing a repo from a session."""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
+        mock_response.json.return_value = {"success": True}
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.remove_repo("test-project", "session-1", "my-repo")
+
+            assert result["removed"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_repos_status(self, client: ACPClient) -> None:
+        """Test getting repo clone status."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "repos": [{"name": "my-repo", "status": "cloned", "url": "https://github.com/org/repo"}]
+        }
+
+        with patch.object(client, "_get_http_client") as mock_get_client:
+            mock_http_client = AsyncMock()
+            mock_http_client.request = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_http_client
+
+            result = await client.get_repos_status("test-project", "session-1")
+
+            assert result["repos"][0]["name"] == "my-repo"
