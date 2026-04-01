@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-04-01)
+
+### Features
+
+- Add scheduled sessions, export, workflow, and repo management tools
+  ([#42](https://github.com/ambient-code/mcp/pull/42),
+  [`554fdac`](https://github.com/ambient-code/mcp/commit/554fdac93e31c16d76f04bfa4cace5afcec3cbd6))
+
+Add 15 new MCP tools expanding the server from 26 to 41 tools:
+
+- Scheduled sessions (9): list, get, create, update, delete, suspend, resume, trigger, list_runs -
+  Session export (1): export_session - Workflow management (2): set_workflow, get_workflow_metadata
+  - Repo management (3): add_repo, remove_repo, get_repos_status
+
+All tools follow the 4-step pattern: client method, formatter, tool definition + dispatch, and unit
+  tests.
+
+Closes #28
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.1 (2026-03-31)
 
 ### Bug Fixes
@@ -24,6 +46,11 @@ __init__.py was never updated when 0.3.0 was released in 95e83ee, leaving __vers
   Align it with pyproject.toml.
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+### Chores
+
+- **release**: 0.3.1
+  ([`1605b9c`](https://github.com/ambient-code/mcp/commit/1605b9c47d124408704a226f3ba75d44669fa406))
 
 
 ## v0.3.0 (2026-03-13)
